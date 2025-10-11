@@ -1,13 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="dev"
+        android:label="Lingo Gym"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         
         <!-- Google Maps API Key -->
+        <!-- ⚠️ IMPORTANTE: Reemplaza YOUR_GOOGLE_MAPS_API_KEY con tu clave real -->
+        <!-- Ver instrucciones en SEGURIDAD_API_KEYS.md -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyCUwXaUvQGkxZUmx81i1JfLgsSFbCY1o44"/>
+            android:value="YOUR_GOOGLE_MAPS_API_KEY"/>
         
         <activity
             android:name=".MainActivity"

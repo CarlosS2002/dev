@@ -4,7 +4,47 @@
 
 Tus claves de API están ahora protegidas y **NO se subirán a Git**.
 
-## 📋 Archivos Protegidos
+## � CONFIGURACIÓN RÁPIDA (IMPORTANTE)
+
+Para que la aplicación funcione después de clonar el repositorio:
+
+### 1️⃣ Android
+Abre `android/app/src/main/AndroidManifest.xml` y reemplaza:
+```xml
+android:value="YOUR_GOOGLE_MAPS_API_KEY"
+```
+Con tu clave real:
+```xml
+android:value="AIzaSyCUwXaUvQGkxZUmx81i1JfLgsSFbCY1o44"
+```
+
+### 2️⃣ iOS
+Abre `ios/Runner/AppDelegate.swift` y reemplaza:
+```swift
+GMSServices.provideAPIKey("YOUR_GOOGLE_MAPS_API_KEY")
+```
+Con tu clave real:
+```swift
+GMSServices.provideAPIKey("AIzaSyCUwXaUvQGkxZUmx81i1JfLgsSFbCY1o44")
+```
+
+### 3️⃣ Flutter (Opcional)
+```bash
+cp lib/api_keys.example.dart lib/api_keys.dart
+# Edita lib/api_keys.dart y añade tu clave
+```
+
+**⚠️ NO HAGAS COMMIT de estos cambios después de añadir tus claves reales**
+
+## 📋 Archivos de Respaldo (Solo Local)
+
+Se han creado archivos de respaldo con tus claves que NO se suben a Git:
+- `android/app/src/main/AndroidManifest.local.xml` ✅ Ignorado por Git
+- `ios/Runner/AppDelegate.local.swift` ✅ Ignorado por Git
+
+Si pierdes tus claves, puedes copiarlas desde estos archivos.
+
+## �📋 Archivos Protegidos
 
 Los siguientes archivos contienen claves sensibles y están en `.gitignore`:
 

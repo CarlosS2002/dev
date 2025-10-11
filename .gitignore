@@ -54,3 +54,7 @@ google-services.json
 GoogleService-Info.plist
 **/android/local.properties
 **/android/key.properties
+*.local.xml
+*.local.swift
+AndroidManifest.local.xml
+AppDelegate.local.swift
