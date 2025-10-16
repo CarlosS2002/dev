@@ -65,11 +65,18 @@ class _GruposScreenState extends State<GruposScreen> {
                 padding: EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    Icon(Icons.group_off, size: 60, color: Colors.grey.shade400),
+                    Icon(
+                      Icons.group_off, 
+                      size: 60, 
+                      color: themeProvider.isDarkMode ? Colors.grey.shade600 : Colors.grey.shade400
+                    ),
                     SizedBox(height: 12),
                     Text(
                       'No perteneces a ningún grupo aún',
-                      style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                      style: TextStyle(
+                        fontSize: 16, 
+                        color: themeProvider.isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     SizedBox(height: 8),
@@ -77,7 +84,9 @@ class _GruposScreenState extends State<GruposScreen> {
                       rol == RolUsuario.entrenador
                           ? 'Crea tu primer grupo'
                           : 'Únete a un grupo para empezar',
-                      style: TextStyle(color: Colors.grey.shade500),
+                      style: TextStyle(
+                        color: themeProvider.isDarkMode ? Colors.grey.shade500 : Colors.grey.shade500
+                      ),
                     ),
                   ],
                 ),
@@ -566,6 +575,8 @@ class DetalleGrupoScreen extends StatelessWidget {
   }
 
   Widget _buildMiembrosTab(BuildContext context, AgendaProvider agendaProvider) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    
     return ListView(
       padding: EdgeInsets.all(16),
       children: [
@@ -603,7 +614,7 @@ class DetalleGrupoScreen extends StatelessWidget {
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
+                    color: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -615,6 +626,7 @@ class DetalleGrupoScreen extends StatelessWidget {
                           fontFamily: 'monospace',
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
+                          color: themeProvider.isDarkMode ? Colors.white : Colors.black,
                         ),
                       ),
                       Icon(Icons.copy, size: 20),
@@ -624,7 +636,10 @@ class DetalleGrupoScreen extends StatelessWidget {
                 SizedBox(height: 4),
                 Text(
                   'Comparte este código para que otros se unan',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  style: TextStyle(
+                    fontSize: 12, 
+                    color: themeProvider.isDarkMode ? Colors.grey.shade500 : Colors.grey.shade600
+                  ),
                 ),
               ],
             ),

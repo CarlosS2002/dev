@@ -2,14 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'theme_provider.dart';
 
-class RegisterScreen extends StatelessWidget {
+class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    TextEditingController registerEmailController = TextEditingController();
-    TextEditingController registerPasswordController = TextEditingController();
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
 
+class _RegisterScreenState extends State<RegisterScreen> {
+  TextEditingController registerEmailController = TextEditingController();
+  TextEditingController registerPasswordController = TextEditingController();
+  bool _obscurePassword = true;
+
+  @override
+  Widget build(BuildContext context) {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return Scaffold(
@@ -94,8 +100,19 @@ class RegisterScreen extends StatelessWidget {
                   enabledBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
                   ),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      color: themeProvider.isDarkMode ? Colors.white70 : Colors.black54,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
                 ),
-                obscureText: true,
+                obscureText: _obscurePassword,
               ),
             ),
             

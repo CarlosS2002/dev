@@ -332,29 +332,6 @@ class MenuScreen extends StatelessWidget {
                 ),
               ],
             ),
-            
-            SizedBox(height: 50),
-            
-            // Botón de regreso
-            Container(
-              margin: EdgeInsets.symmetric(horizontal: 50),
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: onLogout,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade600,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  'Regresar',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
           ],
         ),
       ),

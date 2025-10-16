@@ -18,6 +18,7 @@ class _AuthScreenState extends State<AuthScreen> {
   String? registeredEmail;
   String? registeredPassword;
   String? currentUserEmail; // Para pasar al MenuScreen
+  bool _obscurePassword = true; // Para controlar la visibilidad de la contraseña
 
   // Usuarios de prueba pre-cargados
   final Map<String, String> testUsers = {
@@ -195,8 +196,19 @@ class _AuthScreenState extends State<AuthScreen> {
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
                     ),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        color: themeProvider.isDarkMode ? Colors.white70 : Colors.black54,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
                   ),
-                  obscureText: true,
+                  obscureText: _obscurePassword,
                 ),
               ),
               

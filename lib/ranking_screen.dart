@@ -44,17 +44,32 @@ class _RankingScreenState extends State<RankingScreen> {
                       value: grupoSeleccionado,
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.white,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                      hint: Text('Selecciona un grupo para ver su ranking'),
+                      hint: Text(
+                        'Selecciona un grupo para ver su ranking',
+                        style: TextStyle(
+                          color: themeProvider.isDarkMode ? Colors.white70 : Colors.black54,
+                        ),
+                      ),
+                      style: TextStyle(
+                        color: themeProvider.isDarkMode ? Colors.white : Colors.black,
+                        fontSize: 16,
+                      ),
+                      dropdownColor: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.white,
                       items: grupos.map((grupo) {
                         return DropdownMenuItem(
                           value: grupo.id,
-                          child: Text(grupo.nombre),
+                          child: Text(
+                            grupo.nombre,
+                            style: TextStyle(
+                              color: themeProvider.isDarkMode ? Colors.white : Colors.black,
+                            ),
+                          ),
                         );
                       }).toList(),
                       onChanged: (value) {
@@ -74,16 +89,23 @@ class _RankingScreenState extends State<RankingScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.emoji_events, size: 80, color: Colors.grey.shade400),
+                            Icon(
+                              Icons.emoji_events, 
+                              size: 80, 
+                              color: themeProvider.isDarkMode ? Colors.grey.shade600 : Colors.grey.shade400
+                            ),
                             SizedBox(height: 16),
                             Text(
                               'Selecciona un grupo para ver el ranking',
-                              style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+                              style: TextStyle(
+                                fontSize: 18, 
+                                color: themeProvider.isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600
+                              ),
                             ),
                           ],
                         ),
                       )
-                    : _buildRanking(agendaProvider, grupoSeleccionado!),
+                    : _buildRanking(agendaProvider, grupoSeleccionado!, themeProvider),
               ),
             ],
           ),
@@ -92,7 +114,7 @@ class _RankingScreenState extends State<RankingScreen> {
     );
   }
 
-  Widget _buildRanking(AgendaProvider agendaProvider, String grupoId) {
+  Widget _buildRanking(AgendaProvider agendaProvider, String grupoId, ThemeProvider themeProvider) {
     final ranking = agendaProvider.getRankingGrupo(grupoId);
 
     if (ranking.isEmpty) {
@@ -100,16 +122,25 @@ class _RankingScreenState extends State<RankingScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.hourglass_empty, size: 80, color: Colors.grey.shade400),
+            Icon(
+              Icons.hourglass_empty, 
+              size: 80, 
+              color: themeProvider.isDarkMode ? Colors.grey.shade600 : Colors.grey.shade400
+            ),
             SizedBox(height: 16),
             Text(
               'No hay actividades completadas aún',
-              style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+              style: TextStyle(
+                fontSize: 18, 
+                color: themeProvider.isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600
+              ),
             ),
             SizedBox(height: 8),
             Text(
               'Completa actividades para aparecer en el ranking',
-              style: TextStyle(color: Colors.grey.shade500),
+              style: TextStyle(
+                color: themeProvider.isDarkMode ? Colors.grey.shade500 : Colors.grey.shade500
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -131,11 +162,16 @@ class _RankingScreenState extends State<RankingScreen> {
         return Card(
           margin: EdgeInsets.only(bottom: 12),
           elevation: esUsuarioActual ? 6 : 2,
-          color: esUsuarioActual ? Colors.blue.shade50 : null,
+          color: esUsuarioActual 
+              ? (themeProvider.isDarkMode ? Colors.blue.shade900.withOpacity(0.3) : Colors.blue.shade50)
+              : null,
           child: Container(
             decoration: esUsuarioActual
                 ? BoxDecoration(
-                    border: Border.all(color: Colors.blue, width: 2),
+                    border: Border.all(
+                      color: themeProvider.isDarkMode ? Colors.blue.shade300 : Colors.blue, 
+                      width: 2
+                    ),
                     borderRadius: BorderRadius.circular(8),
                   )
                 : null,
@@ -150,6 +186,7 @@ class _RankingScreenState extends State<RankingScreen> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: esUsuarioActual ? FontWeight.bold : FontWeight.normal,
+                        color: themeProvider.isDarkMode ? Colors.white : Colors.black,
                       ),
                     ),
                   ),
@@ -157,7 +194,7 @@ class _RankingScreenState extends State<RankingScreen> {
                     Container(
                       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.blue,
+                        color: themeProvider.isDarkMode ? Colors.blue.shade700 : Colors.blue,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -183,7 +220,7 @@ class _RankingScreenState extends State<RankingScreen> {
                         '$puntos puntos',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.amber.shade700,
+                          color: themeProvider.isDarkMode ? Colors.amber.shade400 : Colors.amber.shade700,
                           fontSize: 16,
                         ),
                       ),
@@ -194,7 +231,12 @@ class _RankingScreenState extends State<RankingScreen> {
                     children: [
                       Icon(Icons.check_circle, size: 16, color: Colors.green),
                       SizedBox(width: 4),
-                      Text('$actividades actividades completadas'),
+                      Text(
+                        '$actividades actividades completadas',
+                        style: TextStyle(
+                          color: themeProvider.isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -204,7 +246,7 @@ class _RankingScreenState extends State<RankingScreen> {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade600,
+                  color: themeProvider.isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                 ),
               ),
             ),

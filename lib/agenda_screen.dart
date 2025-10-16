@@ -57,22 +57,42 @@ class _AgendaScreenState extends State<AgendaScreen> {
                   value: grupoSeleccionado,
                   decoration: InputDecoration(
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.white,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                     contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
-                  hint: Text('Selecciona un grupo'),
+                  hint: Text(
+                    'Selecciona un grupo',
+                    style: TextStyle(
+                      color: themeProvider.isDarkMode ? Colors.white70 : Colors.black54
+                    ),
+                  ),
+                  style: TextStyle(
+                    color: themeProvider.isDarkMode ? Colors.white : Colors.black,
+                    fontSize: 16,
+                  ),
+                  dropdownColor: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.white,
                   items: [
                     DropdownMenuItem(
                       value: null,
-                      child: Text('Mis actividades individuales'),
+                      child: Text(
+                        'Mis actividades individuales',
+                        style: TextStyle(
+                          color: themeProvider.isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
                     ),
                     ...grupos.map((grupo) {
                       return DropdownMenuItem(
                         value: grupo.id,
-                        child: Text(grupo.nombre),
+                        child: Text(
+                          grupo.nombre,
+                          style: TextStyle(
+                            color: themeProvider.isDarkMode ? Colors.white : Colors.black,
+                          ),
+                        ),
                       );
                     }).toList(),
                   ],
@@ -142,6 +162,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   Widget _buildListaActividades(AgendaProvider agendaProvider, RolUsuario rol) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
     final actividades = agendaProvider
         .getActividadesGrupo(grupoSeleccionado ?? '')
         .where((act) =>
@@ -155,11 +176,18 @@ class _AgendaScreenState extends State<AgendaScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.event_busy, size: 80, color: Colors.grey.shade400),
+            Icon(
+              Icons.event_busy, 
+              size: 80, 
+              color: themeProvider.isDarkMode ? Colors.grey.shade600 : Colors.grey.shade400
+            ),
             SizedBox(height: 16),
             Text(
               'No hay actividades para esta fecha',
-              style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+              style: TextStyle(
+                fontSize: 18, 
+                color: themeProvider.isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600
+              ),
             ),
           ],
         ),
