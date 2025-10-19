@@ -58,3 +58,10 @@ GoogleService-Info.plist
 *.local.swift
 AndroidManifest.local.xml
 AppDelegate.local.swift
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
