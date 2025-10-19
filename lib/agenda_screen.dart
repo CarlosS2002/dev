@@ -211,73 +211,138 @@ class _AgendaScreenState extends State<AgendaScreen> {
                   ? Border.all(color: Colors.green, width: 2)
                   : null,
             ),
-            child: ListTile(
-              contentPadding: EdgeInsets.all(16),
-              leading: rol == RolUsuario.atleta
-                  ? Checkbox(
-                      value: completada,
-                      activeColor: Colors.green,
-                      onChanged: (value) {
-                        if (value == true) {
-                          agendaProvider.completarActividad(actividad.id, widget.userEmail);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('¡Actividad completada! +${actividad.puntosBase} puntos'),
-                              backgroundColor: Colors.green,
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      },
-                    )
-                  : Icon(
-                      completada ? Icons.check_circle : Icons.circle_outlined,
-                      color: completada ? Colors.green : Colors.grey,
-                      size: 32,
+            child: Column(
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.all(16),
+                  leading: rol == RolUsuario.atleta
+                      ? Checkbox(
+                          value: completada,
+                          activeColor: Colors.green,
+                          onChanged: (value) {
+                            if (value == true) {
+                              agendaProvider.completarActividad(actividad.id, widget.userEmail);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('¡Actividad completada! +${actividad.puntosBase} puntos'),
+                                  backgroundColor: Colors.green,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            } else {
+                              // Desmarcar actividad
+                              agendaProvider.descompletarActividad(actividad.id, widget.userEmail);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Actividad desmarcada'),
+                                  backgroundColor: Colors.orange,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                        )
+                      : Icon(
+                          completada ? Icons.check_circle : Icons.circle_outlined,
+                          color: completada ? Colors.green : Colors.grey,
+                          size: 32,
+                        ),
+                  title: Text(
+                    actividad.nombre,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      decoration: completada ? TextDecoration.lineThrough : null,
                     ),
-              title: Text(
-                actividad.nombre,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  decoration: completada ? TextDecoration.lineThrough : null,
-                ),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (actividad.descripcion.isNotEmpty) ...[
-                    SizedBox(height: 8),
-                    Text(actividad.descripcion),
-                  ],
-                  SizedBox(height: 8),
-                  Row(
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.stars, size: 16, color: Colors.amber),
-                      SizedBox(width: 4),
-                      Text(
-                        '${actividad.puntosBase} puntos',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.amber.shade700,
-                        ),
-                      ),
-                      SizedBox(width: 16),
-                      if (rol == RolUsuario.entrenador) ...[
-                        Icon(Icons.people, size: 16, color: Colors.blue),
-                        SizedBox(width: 4),
-                        Text(
-                          '${actividad.completadoPor.length} completadas',
-                          style: TextStyle(color: Colors.blue.shade700),
-                        ),
+                      if (actividad.descripcion.isNotEmpty) ...[
+                        SizedBox(height: 8),
+                        Text(actividad.descripcion),
                       ],
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.stars, size: 16, color: Colors.amber),
+                          SizedBox(width: 4),
+                          Text(
+                            '${actividad.puntosBase} puntos',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber.shade700,
+                            ),
+                          ),
+                          SizedBox(width: 16),
+                          if (rol == RolUsuario.entrenador) ...[
+                            Icon(Icons.people, size: 16, color: Colors.blue),
+                            SizedBox(width: 4),
+                            Text(
+                              '${actividad.completadoPor.length} completadas',
+                              style: TextStyle(color: Colors.blue.shade700),
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
-                ],
-              ),
-              trailing: completada
-                  ? Icon(Icons.check_circle, color: Colors.green, size: 32)
-                  : null,
+                  trailing: completada
+                      ? Icon(Icons.check_circle, color: Colors.green, size: 32)
+                      : null,
+                ),
+                // Mostrar quiénes completaron la actividad (para entrenadores)
+                if (rol == RolUsuario.entrenador && actividad.completadoPor.isNotEmpty)
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(8),
+                        bottomRight: Radius.circular(8),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.check_circle, size: 16, color: Colors.green),
+                            SizedBox(width: 4),
+                            Text(
+                              'Completado por:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: actividad.completadoPor.map((email) {
+                            return Chip(
+                              avatar: CircleAvatar(
+                                child: Text(
+                                  email[0].toUpperCase(),
+                                  style: TextStyle(fontSize: 10),
+                                ),
+                              ),
+                              label: Text(
+                                email.split('@')[0],
+                                style: TextStyle(fontSize: 12),
+                              ),
+                              visualDensity: VisualDensity.compact,
+                              backgroundColor: Colors.green.shade100,
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
         );

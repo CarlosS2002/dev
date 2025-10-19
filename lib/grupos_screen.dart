@@ -20,8 +20,12 @@ class _GruposScreenState extends State<GruposScreen> {
       builder: (context, themeProvider, child) {
         final agendaProvider = Provider.of<AgendaProvider>(context);
         final rol = agendaProvider.getRol(widget.userEmail);
-        final misGrupos = agendaProvider.getGruposUsuario(widget.userEmail);
         final gruposComoEntrenador = agendaProvider.getGruposComoEntrenador(widget.userEmail);
+        // Si es entrenador, solo mostrar grupos que administra
+        // Si es atleta, mostrar grupos donde participa
+        final gruposParaMostrar = rol == RolUsuario.entrenador 
+            ? gruposComoEntrenador 
+            : agendaProvider.getGruposUsuario(widget.userEmail);
 
         return Scaffold(
           appBar: AppBar(
@@ -30,76 +34,66 @@ class _GruposScreenState extends State<GruposScreen> {
           body: ListView(
             padding: EdgeInsets.all(16),
             children: [
-              // Grupos como entrenador
-              if (gruposComoEntrenador.isNotEmpty) ...[
-                Row(
-                  children: [
-                Icon(Icons.star, color: Colors.amber),
-                SizedBox(width: 8),
-                Text(
-                  'Grupos que administro',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            SizedBox(height: 12),
-            ...gruposComoEntrenador.map((grupo) => _buildGrupoCard(grupo, true, agendaProvider)).toList(),
-            SizedBox(height: 24),
-          ],
-
-          // Grupos como miembro
-          Row(
-            children: [
-              Icon(Icons.group, color: Colors.blue),
-              SizedBox(width: 8),
-              Text(
-                'Grupos donde participo',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              // Título según el rol
+              Row(
+                children: [
+                  Icon(
+                    rol == RolUsuario.entrenador ? Icons.star : Icons.group, 
+                    color: rol == RolUsuario.entrenador ? Colors.amber : Colors.blue
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    rol == RolUsuario.entrenador ? 'Grupos que administro' : 'Grupos donde participo',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
+              SizedBox(height: 12),
+              
+              // Lista de grupos o mensaje vacío
+              if (gruposParaMostrar.isEmpty)
+                Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.group_off, 
+                          size: 60, 
+                          color: themeProvider.isDarkMode ? Colors.grey.shade600 : Colors.grey.shade400
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          rol == RolUsuario.entrenador 
+                              ? 'No administras ningún grupo aún'
+                              : 'No perteneces a ningún grupo aún',
+                          style: TextStyle(
+                            fontSize: 16, 
+                            color: themeProvider.isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          rol == RolUsuario.entrenador
+                              ? 'Crea tu primer grupo'
+                              : 'Únete a un grupo para empezar',
+                          style: TextStyle(
+                            color: themeProvider.isDarkMode ? Colors.grey.shade500 : Colors.grey.shade500
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                ...gruposParaMostrar.map((grupo) {
+                  final esEntrenador = grupo.entrenadorId == widget.userEmail;
+                  return _buildGrupoCard(grupo, esEntrenador, agendaProvider);
+                }).toList(),
             ],
           ),
-          SizedBox(height: 12),
-          if (misGrupos.isEmpty)
-            Card(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.group_off, 
-                      size: 60, 
-                      color: themeProvider.isDarkMode ? Colors.grey.shade600 : Colors.grey.shade400
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      'No perteneces a ningún grupo aún',
-                      style: TextStyle(
-                        fontSize: 16, 
-                        color: themeProvider.isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      rol == RolUsuario.entrenador
-                          ? 'Crea tu primer grupo'
-                          : 'Únete a un grupo para empezar',
-                      style: TextStyle(
-                        color: themeProvider.isDarkMode ? Colors.grey.shade500 : Colors.grey.shade500
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            ...misGrupos.map((grupo) {
-              final esEntrenador = grupo.entrenadorId == widget.userEmail;
-              return _buildGrupoCard(grupo, esEntrenador, agendaProvider);
-            }).toList(),
-        ],
-      ),
-      floatingActionButton: _buildBotonAccion(context, agendaProvider, rol),
+          floatingActionButton: _buildBotonAccion(context, agendaProvider, rol),
         );
       },
     );
@@ -448,6 +442,8 @@ class DetalleGrupoScreen extends StatelessWidget {
   }
 
   Widget _buildTareasTab(BuildContext context, AgendaProvider agendaProvider, List<Actividad> actividadesHoy) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    
     if (actividadesHoy.isEmpty) {
       return Center(
         child: Column(
@@ -461,7 +457,7 @@ class DetalleGrupoScreen extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              'Hoy es 8 de Octubre',
+              'Hoy es 19 de Octubre',
               style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
             ),
           ],
@@ -486,87 +482,150 @@ class DetalleGrupoScreen extends StatelessWidget {
                   ? Border.all(color: Colors.green, width: 2)
                   : null,
             ),
-            child: ListTile(
-              contentPadding: EdgeInsets.all(16),
-              leading: esEntrenador
-                  ? Icon(
-                      completada ? Icons.check_circle : Icons.circle_outlined,
-                      color: completada ? Colors.green : Colors.grey,
-                      size: 32,
-                    )
-                  : Checkbox(
-                      value: completada,
-                      activeColor: Colors.green,
-                      onChanged: completada
-                          ? null
-                          : (value) {
-                              if (value == true) {
-                                agendaProvider.completarActividad(actividad.id, userEmail);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('¡Tarea completada! +${actividad.puntosBase} puntos'),
-                                    backgroundColor: Colors.green,
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                              }
-                            },
+            child: Column(
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.all(16),
+                  leading: esEntrenador
+                      ? Icon(
+                          completada ? Icons.check_circle : Icons.circle_outlined,
+                          color: completada ? Colors.green : Colors.grey,
+                          size: 32,
+                        )
+                      : Checkbox(
+                          value: completada,
+                          activeColor: Colors.green,
+                          onChanged: (value) {
+                            if (value == true) {
+                              agendaProvider.completarActividad(actividad.id, userEmail);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('¡Tarea completada! +${actividad.puntosBase} puntos'),
+                                  backgroundColor: Colors.green,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            } else {
+                              // Desmarcar actividad
+                              agendaProvider.descompletarActividad(actividad.id, userEmail);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Tarea desmarcada'),
+                                  backgroundColor: Colors.orange,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                  title: Text(
+                    actividad.nombre,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      decoration: completada ? TextDecoration.lineThrough : null,
                     ),
-              title: Text(
-                actividad.nombre,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  decoration: completada ? TextDecoration.lineThrough : null,
-                ),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (actividad.descripcion.isNotEmpty) ...[
-                    SizedBox(height: 8),
-                    Text(actividad.descripcion),
-                  ],
-                  SizedBox(height: 8),
-                  Row(
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.stars, size: 16, color: Colors.amber),
-                      SizedBox(width: 4),
-                      Text(
-                        '${actividad.puntosBase} puntos',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.amber.shade700,
-                        ),
-                      ),
-                      if (esEntrenador) ...[
-                        SizedBox(width: 16),
-                        Icon(Icons.people, size: 16, color: Colors.blue),
-                        SizedBox(width: 4),
-                        Text(
-                          '${actividad.completadoPor.length}/${grupo.miembrosIds.length} completaron',
-                          style: TextStyle(color: Colors.blue.shade700),
-                        ),
+                      if (actividad.descripcion.isNotEmpty) ...[
+                        SizedBox(height: 8),
+                        Text(actividad.descripcion),
                       ],
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.stars, size: 16, color: Colors.amber),
+                          SizedBox(width: 4),
+                          Text(
+                            '${actividad.puntosBase} puntos',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber.shade700,
+                            ),
+                          ),
+                          if (esEntrenador) ...[
+                            SizedBox(width: 16),
+                            Icon(Icons.people, size: 16, color: Colors.blue),
+                            SizedBox(width: 4),
+                            Text(
+                              '${actividad.completadoPor.length}/${grupo.miembrosIds.length} completaron',
+                              style: TextStyle(color: Colors.blue.shade700),
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
-                ],
-              ),
-              trailing: completada
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                  trailing: completada
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_circle, color: Colors.green, size: 32),
+                            Text(
+                              '✓',
+                              style: TextStyle(
+                                color: Colors.green,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        )
+                      : null,
+                ),
+                // Mostrar quiénes completaron (para entrenadores)
+                if (esEntrenador && actividad.completadoPor.isNotEmpty)
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(8),
+                        bottomRight: Radius.circular(8),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.check_circle, color: Colors.green, size: 32),
-                        Text(
-                          '✓',
-                          style: TextStyle(
-                            color: Colors.green,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Row(
+                          children: [
+                            Icon(Icons.check_circle, size: 16, color: Colors.green),
+                            SizedBox(width: 4),
+                            Text(
+                              'Completado por:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: actividad.completadoPor.map((email) {
+                            return Chip(
+                              avatar: CircleAvatar(
+                                child: Text(
+                                  email[0].toUpperCase(),
+                                  style: TextStyle(fontSize: 10),
+                                ),
+                              ),
+                              label: Text(
+                                email.split('@')[0],
+                                style: TextStyle(fontSize: 12),
+                              ),
+                              visualDensity: VisualDensity.compact,
+                              backgroundColor: Colors.green.shade100,
+                            );
+                          }).toList(),
                         ),
                       ],
-                    )
-                  : null,
+                    ),
+                  ),
+              ],
             ),
           ),
         );

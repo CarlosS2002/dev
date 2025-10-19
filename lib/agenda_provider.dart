@@ -23,136 +23,114 @@ class AgendaProvider extends ChangeNotifier {
 
   // Lista de actividades
   final List<Actividad> _actividades = [
-    // Actividades del 8 de octubre
+    // Actividades de HOY - 19 de octubre de 2025
     Actividad(
       id: 'act1',
-      nombre: 'Cardio matutino',
-      grupoId: 'grupo1',
-      fecha: DateTime(2025, 10, 8),
-      descripcion: 'Correr 5km a ritmo moderado',
-      puntosBase: 50,
-      creadoPor: 'carlos@test.com',
-      completadoPor: [],
-    ),
-    Actividad(
-      id: 'act2',
-      nombre: 'Pesas',
-      grupoId: 'grupo1',
-      fecha: DateTime(2025, 10, 8),
-      descripcion: 'Rutina de piernas y glúteos',
-      puntosBase: 75,
-      creadoPor: 'carlos@test.com',
-      completadoPor: [],
-    ),
-    
-    // Actividades de HOY - 15 de octubre de 2025
-    Actividad(
-      id: 'act3',
       nombre: 'Cardio Intenso',
       grupoId: 'grupo1',
-      fecha: DateTime(2025, 10, 15),
+      fecha: DateTime(2025, 10, 19),
       descripcion: 'Correr 8km a ritmo moderado-alto',
       puntosBase: 60,
       creadoPor: 'carlos@test.com',
       completadoPor: [],
     ),
     Actividad(
-      id: 'act4',
+      id: 'act2',
       nombre: 'Entrenamiento de Fuerza',
       grupoId: 'grupo1',
-      fecha: DateTime(2025, 10, 15),
+      fecha: DateTime(2025, 10, 19),
       descripcion: 'Rutina de pecho y tríceps - 4 series de 12 reps',
       puntosBase: 70,
       creadoPor: 'carlos@test.com',
       completadoPor: [],
     ),
     Actividad(
-      id: 'act5',
+      id: 'act3',
       nombre: 'Yoga y Flexibilidad',
       grupoId: 'grupo1',
-      fecha: DateTime(2025, 10, 15),
+      fecha: DateTime(2025, 10, 19),
       descripcion: 'Sesión de yoga de 45 minutos + estiramientos',
       puntosBase: 50,
       creadoPor: 'carlos@test.com',
       completadoPor: [],
     ),
     Actividad(
-      id: 'act6',
+      id: 'act4',
       nombre: 'Natación',
       grupoId: 'grupo1',
-      fecha: DateTime(2025, 10, 15),
+      fecha: DateTime(2025, 10, 19),
       descripcion: 'Nadar 1000 metros estilo libre',
       puntosBase: 65,
       creadoPor: 'carlos@test.com',
       completadoPor: [],
     ),
     Actividad(
-      id: 'act7',
+      id: 'act5',
       nombre: 'Ciclismo',
       grupoId: 'grupo1',
-      fecha: DateTime(2025, 10, 15),
+      fecha: DateTime(2025, 10, 19),
       descripcion: 'Recorrido en bicicleta de 20km en ruta mixta',
       puntosBase: 75,
       creadoPor: 'carlos@test.com',
       completadoPor: [],
     ),
     
-    // Actividades de MAÑANA - 16 de octubre de 2025
+    // Actividades de MAÑANA - 20 de octubre de 2025
     Actividad(
-      id: 'act8',
+      id: 'act6',
       nombre: 'HIIT Matutino',
       grupoId: 'grupo1',
-      fecha: DateTime(2025, 10, 16),
+      fecha: DateTime(2025, 10, 20),
       descripcion: 'Entrenamiento de intervalos de alta intensidad - 30 min',
       puntosBase: 80,
       creadoPor: 'carlos@test.com',
       completadoPor: [],
     ),
     Actividad(
-      id: 'act9',
+      id: 'act7',
       nombre: 'Pesas - Espalda y Bíceps',
       grupoId: 'grupo1',
-      fecha: DateTime(2025, 10, 16),
+      fecha: DateTime(2025, 10, 20),
       descripcion: 'Rutina de espalda completa + curl de bíceps - 5 series',
       puntosBase: 75,
       creadoPor: 'carlos@test.com',
       completadoPor: [],
     ),
     Actividad(
-      id: 'act10',
+      id: 'act8',
       nombre: 'Boxeo',
       grupoId: 'grupo1',
-      fecha: DateTime(2025, 10, 16),
+      fecha: DateTime(2025, 10, 20),
       descripcion: 'Entrenamiento de boxeo con saco - 45 minutos',
       puntosBase: 70,
       creadoPor: 'carlos@test.com',
       completadoPor: [],
     ),
     Actividad(
-      id: 'act11',
+      id: 'act9',
       nombre: 'Pilates Core',
       grupoId: 'grupo1',
-      fecha: DateTime(2025, 10, 16),
+      fecha: DateTime(2025, 10, 20),
       descripcion: 'Ejercicios de pilates enfocados en abdominales y core',
       puntosBase: 55,
       creadoPor: 'carlos@test.com',
       completadoPor: [],
     ),
     Actividad(
-      id: 'act12',
+      id: 'act10',
       nombre: 'Entrenamiento Funcional',
       grupoId: 'grupo1',
-      fecha: DateTime(2025, 10, 16),
+      fecha: DateTime(2025, 10, 20),
       descripcion: 'Circuito funcional: burpees, saltos, planchas - 30 min',
       puntosBase: 65,
       creadoPor: 'carlos@test.com',
       completadoPor: [],
     ),
     Actividad(
-      id: 'act13',
+      id: 'act11',
       nombre: 'Caminata Activa',
       grupoId: 'grupo1',
-      fecha: DateTime(2025, 10, 16),
+      fecha: DateTime(2025, 10, 20),
       descripcion: 'Caminata rápida de 10km en parque con elevaciones',
       puntosBase: 60,
       creadoPor: 'carlos@test.com',
@@ -206,6 +184,15 @@ class AgendaProvider extends ChangeNotifier {
     final index = _actividades.indexWhere((act) => act.id == actividadId);
     if (index != -1 && !_actividades[index].completadoPor.contains(usuarioEmail)) {
       _actividades[index].completadoPor.add(usuarioEmail);
+      notifyListeners();
+    }
+  }
+
+  // Desmarcar una actividad completada (para cuando se completa por error)
+  void descompletarActividad(String actividadId, String usuarioEmail) {
+    final index = _actividades.indexWhere((act) => act.id == actividadId);
+    if (index != -1 && _actividades[index].completadoPor.contains(usuarioEmail)) {
+      _actividades[index].completadoPor.remove(usuarioEmail);
       notifyListeners();
     }
   }
