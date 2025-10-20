@@ -20,12 +20,31 @@ class ActividadGenerada {
 
 class GeminiService {
   late final GenerativeModel _model;
-  static const String _apiKey = 'AIzaSyDa8gPD4MfEK_3JZ7V4dFGqK8Npy5wRHkQ'; // API Key temporal para pruebas
+  
+  // NOTA: Esta es una API Key temporal de desarrollo
+  // Para producción, obtén tu propia key en: https://aistudio.google.com/app/apikey
+  // y reemplázala aquí o usa variables de entorno
+  static const String _apiKey = String.fromEnvironment(
+    'GEMINI_API_KEY',
+    defaultValue: '', // Dejamos vacío para que uses tu propia key
+  );
 
-  GeminiService() {
+  GeminiService({String? apiKey}) {
+    final key = apiKey ?? _apiKey;
+    
+    if (key.isEmpty) {
+      throw Exception(
+        '⚠️ API Key de Gemini no configurada.\n\n'
+        'Para usar la generación de actividades con IA:\n'
+        '1. Obtén tu API key gratuita en: https://aistudio.google.com/app/apikey\n'
+        '2. Pasa la key al constructor: GeminiService(apiKey: "tu-key")\n'
+        '   O configúrala como variable de entorno GEMINI_API_KEY'
+      );
+    }
+    
     _model = GenerativeModel(
       model: 'gemini-1.5-flash',
-      apiKey: _apiKey,
+      apiKey: key,
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'models.dart';
 import 'gemini_service.dart';
+import 'api_keys.dart';
 
 class AgendaProvider extends ChangeNotifier {
   // Mapa para almacenar los roles de los usuarios
@@ -298,7 +299,9 @@ class AgendaProvider extends ChangeNotifier {
 
   // ============= INTEGRACIÓN CON GEMINI AI =============
   
-  final GeminiService _geminiService = GeminiService();
+  late final GeminiService _geminiService = GeminiService(
+    apiKey: ApiKeys.geminiApiKey,
+  );
   bool _generandoActividades = false;
 
   bool get generandoActividades => _generandoActividades;
