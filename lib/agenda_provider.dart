@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'models.dart';
+import 'gemini_service.dart';
 
 class AgendaProvider extends ChangeNotifier {
   // Mapa para almacenar los roles de los usuarios
@@ -293,5 +294,88 @@ class AgendaProvider extends ChangeNotifier {
     final rolAlUnirse = grupo.rolesAlUnirse[usuarioEmail];
     
     return rolActual == rolAlUnirse;
+  }
+
+  // ============= INTEGRACIÓN CON GEMINI AI =============
+  
+  final GeminiService _geminiService = GeminiService();
+  bool _generandoActividades = false;
+
+  bool get generandoActividades => _generandoActividades;
+
+  /// Genera actividades diarias con IA para un usuario sin grupo o que quiere alternativas
+  Future<List<Actividad>> generarActividadesConIA({
+    required String usuarioEmail,
+    String? grupoId,
+    bool esAlternativa = false,
+  }) async {
+    _generandoActividades = true;
+    notifyListeners();
+
+    try {
+      // Obtener información del usuario (aquí puedes agregar más datos del perfil)
+      final usuario = usuarioEmail.split('@')[0];
+      
+      List<ActividadGenerada> actividadesGeneradas;
+      
+      if (esAlternativa && grupoId != null) {
+        // Generar alternativas a las actividades existentes
+        final actividadesExistentes = getActividadesGrupo(grupoId)
+            .where((act) => act.fecha.day == DateTime.now().day)
+            .map((act) => act.nombre)
+            .toList();
+        
+        actividadesGeneradas = await _geminiService.generarActividadesAlternativas(
+          nombreUsuario: usuario,
+          actividadesExistentes: actividadesExistentes,
+        );
+      } else {
+        // Generar actividades nuevas para el día
+        actividadesGeneradas = await _geminiService.generarActividadesDiarias(
+          nombreUsuario: usuario,
+        );
+      }
+
+      // Convertir ActividadGenerada a Actividad del modelo
+      final actividades = <Actividad>[];
+      for (int i = 0; i < actividadesGeneradas.length; i++) {
+        final actGen = actividadesGeneradas[i];
+        final actividad = Actividad(
+          id: 'ai_${DateTime.now().millisecondsSinceEpoch}_$i',
+          nombre: actGen.nombre,
+          grupoId: grupoId ?? 'personal_$usuarioEmail', // Grupo personal si no hay grupo
+          fecha: DateTime.now(),
+          descripcion: actGen.descripcion,
+          puntosBase: actGen.puntosBase,
+          creadoPor: 'Gemini AI',
+          completadoPor: [],
+        );
+        
+        // Agregar a la lista de actividades
+        _actividades.add(actividad);
+        actividades.add(actividad);
+      }
+
+      _generandoActividades = false;
+      notifyListeners();
+      return actividades;
+    } catch (e) {
+      print('Error al generar actividades con IA: $e');
+      _generandoActividades = false;
+      notifyListeners();
+      return [];
+    }
+  }
+
+  /// Obtiene las actividades personales generadas por IA para un usuario
+  List<Actividad> getActividadesPersonales(String usuarioEmail) {
+    final grupoPersonal = 'personal_$usuarioEmail';
+    return _actividades
+        .where((act) => 
+            act.grupoId == grupoPersonal && 
+            act.fecha.day == DateTime.now().day &&
+            act.fecha.month == DateTime.now().month &&
+            act.fecha.year == DateTime.now().year)
+        .toList();
   }
 }

@@ -163,13 +163,17 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   Widget _buildListaActividades(AgendaProvider agendaProvider, RolUsuario rol) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final actividades = agendaProvider
-        .getActividadesGrupo(grupoSeleccionado ?? '')
-        .where((act) =>
-            act.fecha.year == fechaSeleccionada.year &&
-            act.fecha.month == fechaSeleccionada.month &&
-            act.fecha.day == fechaSeleccionada.day)
-        .toList();
+    
+    // Si no hay grupo seleccionado, mostrar actividades personales generadas por IA
+    final actividades = grupoSeleccionado == null
+        ? agendaProvider.getActividadesPersonales(widget.userEmail)
+        : agendaProvider
+            .getActividadesGrupo(grupoSeleccionado!)
+            .where((act) =>
+                act.fecha.year == fechaSeleccionada.year &&
+                act.fecha.month == fechaSeleccionada.month &&
+                act.fecha.day == fechaSeleccionada.day)
+            .toList();
 
     if (actividades.isEmpty) {
       return Center(
@@ -177,18 +181,31 @@ class _AgendaScreenState extends State<AgendaScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.event_busy, 
+              grupoSeleccionado == null ? Icons.auto_awesome : Icons.event_busy, 
               size: 80, 
-              color: themeProvider.isDarkMode ? Colors.grey.shade600 : Colors.grey.shade400
+              color: grupoSeleccionado == null ? Colors.deepPurple.shade300 : (themeProvider.isDarkMode ? Colors.grey.shade600 : Colors.grey.shade400)
             ),
             SizedBox(height: 16),
             Text(
-              'No hay actividades para esta fecha',
+              grupoSeleccionado == null 
+                  ? 'No tienes actividades personales' 
+                  : 'No hay actividades para esta fecha',
               style: TextStyle(
                 fontSize: 18, 
                 color: themeProvider.isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600
               ),
             ),
+            if (grupoSeleccionado == null) ...[
+              SizedBox(height: 12),
+              Text(
+                'Genera rutinas personalizadas con IA',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.deepPurple.shade300,
+                ),
+              ),
+            ],
           ],
         ),
       );
@@ -254,13 +271,45 @@ class _AgendaScreenState extends State<AgendaScreen> {
                         }
                       },
                     ),
-                  title: Text(
-                    actividad.nombre,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      decoration: completada ? TextDecoration.lineThrough : null,
-                    ),
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          actividad.nombre,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            decoration: completada ? TextDecoration.lineThrough : null,
+                          ),
+                        ),
+                      ),
+                      if (actividad.creadoPor == 'Gemini AI') ...[
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Colors.deepPurple, Colors.purple.shade300],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.auto_awesome, size: 14, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text(
+                                'IA',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -403,13 +452,78 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   Widget? _buildBotonAccion(BuildContext context, AgendaProvider agendaProvider, RolUsuario rol) {
     if (rol == RolUsuario.entrenador && grupoSeleccionado != null) {
+      // Botón para entrenador: crear actividad manual
       return FloatingActionButton.extended(
         onPressed: () => _mostrarDialogoCrearActividad(context, agendaProvider),
         icon: Icon(Icons.add),
         label: Text('Crear Actividad'),
       );
+    } else if (grupoSeleccionado == null) {
+      // Botón para generar actividades con IA cuando no hay grupo seleccionado
+      return FloatingActionButton.extended(
+        onPressed: agendaProvider.generandoActividades 
+            ? null 
+            : () => _generarActividadesConIA(context, agendaProvider),
+        icon: agendaProvider.generandoActividades
+            ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+              )
+            : Icon(Icons.auto_awesome),
+        label: Text(agendaProvider.generandoActividades ? 'Generando...' : 'Generar con IA'),
+        backgroundColor: Colors.deepPurple,
+      );
     }
     return null;
+  }
+
+  // Genera actividades personalizadas con Gemini AI
+  Future<void> _generarActividadesConIA(BuildContext context, AgendaProvider agendaProvider) async {
+    try {
+      final actividades = await agendaProvider.generarActividadesConIA(
+        usuarioEmail: widget.userEmail,
+      );
+
+      if (actividades.isNotEmpty && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.auto_awesome, color: Colors.white),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '¡${actividades.length} actividades generadas con IA!',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.deepPurple,
+            duration: Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'Ver',
+              textColor: Colors.white,
+              onPressed: () {
+                setState(() {
+                  grupoSeleccionado = null; // Asegurar que se vean las actividades personales
+                });
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al generar actividades: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _mostrarDialogoCrearActividad(BuildContext context, AgendaProvider agendaProvider) {
