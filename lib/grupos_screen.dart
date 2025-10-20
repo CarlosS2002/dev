@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'agenda_provider.dart';
 import 'models.dart';
 import 'theme_provider.dart';
+import 'dart:math';
 
 class GruposScreen extends StatefulWidget {
   final String userEmail;
@@ -14,6 +16,13 @@ class GruposScreen extends StatefulWidget {
 }
 
 class _GruposScreenState extends State<GruposScreen> {
+  // Generar código corto con letras y números (6 caracteres)
+  String _generarCodigoGrupo() {
+    const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final random = Random();
+    return List.generate(6, (index) => caracteres[random.nextInt(caracteres.length)]).join();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ThemeProvider>(
@@ -191,74 +200,183 @@ class _GruposScreenState extends State<GruposScreen> {
     final nombreController = TextEditingController();
     final descripcionController = TextEditingController();
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    bool entrenadorParticipa = true; // Por defecto sí participa
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Crear Nuevo Grupo'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nombreController,
-                style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black),
-                decoration: InputDecoration(
-                  labelText: 'Nombre del grupo',
-                  labelStyle: TextStyle(color: themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
-                  border: OutlineInputBorder(),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text('Crear Nuevo Grupo'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nombreController,
+                  style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black),
+                  decoration: InputDecoration(
+                    labelText: 'Nombre del grupo',
+                    labelStyle: TextStyle(color: themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
+                    border: OutlineInputBorder(),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
+                    ),
+                    prefixIcon: Icon(Icons.group),
                   ),
-                  prefixIcon: Icon(Icons.group),
                 ),
-              ),
-              SizedBox(height: 12),
-              TextField(
-                controller: descripcionController,
-                style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black),
-                decoration: InputDecoration(
-                  labelText: 'Descripción (opcional)',
-                  labelStyle: TextStyle(color: themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
-                  border: OutlineInputBorder(),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
+                SizedBox(height: 12),
+                TextField(
+                  controller: descripcionController,
+                  style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black),
+                  decoration: InputDecoration(
+                    labelText: 'Descripción (opcional)',
+                    labelStyle: TextStyle(color: themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
+                    border: OutlineInputBorder(),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
+                    ),
+                    prefixIcon: Icon(Icons.description),
                   ),
-                  prefixIcon: Icon(Icons.description),
+                  maxLines: 3,
                 ),
-                maxLines: 3,
-              ),
-            ],
+                SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: themeProvider.isDarkMode ? Colors.white38 : Colors.grey.shade400
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: CheckboxListTile(
+                    title: Text(
+                      'Participar en este grupo',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      entrenadorParticipa 
+                          ? 'Aparecerás en el ranking y podrás completar actividades'
+                          : 'Solo administrarás el grupo sin participar en actividades',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    value: entrenadorParticipa,
+                    activeColor: Colors.blue.shade600,
+                    onChanged: (value) {
+                      setState(() {
+                        entrenadorParticipa = value ?? true;
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (nombreController.text.isNotEmpty) {
+                  final grupo = Grupo(
+                    id: _generarCodigoGrupo(),
+                    nombre: nombreController.text,
+                    descripcion: descripcionController.text,
+                    entrenadorId: widget.userEmail,
+                    entrenadorNombre: widget.userEmail.split('@')[0],
+                    // Solo agregar al entrenador si decidió participar
+                    miembrosIds: entrenadorParticipa ? [widget.userEmail] : [],
+                    fechaCreacion: DateTime.now(),
+                  );
+                  agendaProvider.agregarGrupo(grupo);
+                  Navigator.pop(context);
+                  
+                  // Mostrar diálogo con el código del grupo
+                  _mostrarDialogoCodigoGrupo(context, grupo.id);
+                }
+              },
+              child: Text('Crear'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _mostrarDialogoCodigoGrupo(BuildContext context, String codigo) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text('¡Grupo Creado!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Comparte este código con los miembros:',
+              style: TextStyle(fontSize: 16),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green, width: 2),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    codigo,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 32,
+                      letterSpacing: 4,
+                      color: themeProvider.isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: codigo));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              Icon(Icons.check, color: Colors.white),
+                              SizedBox(width: 8),
+                              Text('Código copiado al portapapeles'),
+                            ],
+                          ),
+                          backgroundColor: Colors.green,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    icon: Icon(Icons.copy),
+                    label: Text('Copiar Código'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (nombreController.text.isNotEmpty) {
-                final grupo = Grupo(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  nombre: nombreController.text,
-                  descripcion: descripcionController.text,
-                  entrenadorId: widget.userEmail,
-                  entrenadorNombre: widget.userEmail.split('@')[0],
-                  miembrosIds: [widget.userEmail],
-                  fechaCreacion: DateTime.now(),
-                );
-                agendaProvider.agregarGrupo(grupo);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Grupo creado exitosamente'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              }
-            },
-            child: Text('Crear'),
+            child: Text('Cerrar'),
           ),
         ],
       ),
@@ -486,38 +604,45 @@ class DetalleGrupoScreen extends StatelessWidget {
               children: [
                 ListTile(
                   contentPadding: EdgeInsets.all(16),
-                  leading: esEntrenador
-                      ? Icon(
-                          completada ? Icons.check_circle : Icons.circle_outlined,
-                          color: completada ? Colors.green : Colors.grey,
-                          size: 32,
-                        )
-                      : Checkbox(
-                          value: completada,
-                          activeColor: Colors.green,
-                          onChanged: (value) {
-                            if (value == true) {
-                              agendaProvider.completarActividad(actividad.id, userEmail);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('¡Tarea completada! +${actividad.puntosBase} puntos'),
-                                  backgroundColor: Colors.green,
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            } else {
-                              // Desmarcar actividad
-                              agendaProvider.descompletarActividad(actividad.id, userEmail);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Tarea desmarcada'),
-                                  backgroundColor: Colors.orange,
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            }
-                          },
-                        ),
+                  leading: Checkbox(
+                      value: completada,
+                      activeColor: Colors.green,
+                      onChanged: (value) {
+                        // Limpiar SnackBars previos para evitar spam
+                        ScaffoldMessenger.of(context).clearSnackBars();
+                        
+                        if (value == true) {
+                          final resultado = agendaProvider.completarActividad(actividad.id, userEmail);
+                          if (resultado) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('¡Tarea completada! +${actividad.puntosBase} puntos'),
+                                backgroundColor: Colors.green,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('No puedes completar esta actividad. Tu rol cambió desde que te uniste al grupo.'),
+                                backgroundColor: Colors.red,
+                                duration: Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        } else {
+                          // Desmarcar actividad
+                          agendaProvider.descompletarActividad(actividad.id, userEmail);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Tarea desmarcada'),
+                              backgroundColor: Colors.orange,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                    ),
                   title: Text(
                     actividad.nombre,
                     style: TextStyle(
@@ -559,25 +684,13 @@ class DetalleGrupoScreen extends StatelessWidget {
                     ],
                   ),
                   trailing: completada
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.check_circle, color: Colors.green, size: 32),
-                            Text(
-                              '✓',
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        )
+                      ? Icon(Icons.check_circle, color: Colors.green, size: 32)
                       : null,
                 ),
-                // Mostrar quiénes completaron (para entrenadores)
-                if (esEntrenador && actividad.completadoPor.isNotEmpty)
+                // Mostrar estado de todos los miembros (para todos)
+                if (grupo.miembrosIds.length > 1)
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
                       borderRadius: BorderRadius.only(
@@ -590,35 +703,64 @@ class DetalleGrupoScreen extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.check_circle, size: 16, color: Colors.green),
+                            Icon(Icons.people, size: 16, color: Colors.blue),
                             SizedBox(width: 4),
                             Text(
-                              'Completado por:',
+                              'Estado del equipo:',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
                               ),
                             ),
+                            Spacer(),
+                            Text(
+                              '${actividad.completadoPor.length}/${grupo.miembrosIds.length} completaron',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
                           ],
                         ),
-                        SizedBox(height: 4),
+                        SizedBox(height: 8),
                         Wrap(
                           spacing: 8,
-                          runSpacing: 4,
-                          children: actividad.completadoPor.map((email) {
-                            return Chip(
-                              avatar: CircleAvatar(
-                                child: Text(
-                                  email[0].toUpperCase(),
-                                  style: TextStyle(fontSize: 10),
+                          runSpacing: 8,
+                          children: grupo.miembrosIds.map((email) {
+                            final completado = actividad.completadoPor.contains(email);
+                            return Container(
+                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: completado 
+                                    ? Colors.green.shade100 
+                                    : (themeProvider.isDarkMode ? Colors.grey.shade700 : Colors.grey.shade200),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: completado ? Colors.green : Colors.grey.shade400,
+                                  width: 1.5,
                                 ),
                               ),
-                              label: Text(
-                                email.split('@')[0],
-                                style: TextStyle(fontSize: 12),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    completado ? Icons.check_circle : Icons.radio_button_unchecked,
+                                    size: 16,
+                                    color: completado ? Colors.green.shade700 : Colors.grey.shade500,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    email.split('@')[0],
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: completado ? FontWeight.bold : FontWeight.normal,
+                                      color: completado 
+                                          ? Colors.green.shade900 
+                                          : (themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              visualDensity: VisualDensity.compact,
-                              backgroundColor: Colors.green.shade100,
                             );
                           }).toList(),
                         ),
@@ -670,31 +812,54 @@ class DetalleGrupoScreen extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: 4),
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        grupo.id,
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: themeProvider.isDarkMode ? Colors.white : Colors.black,
+                InkWell(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: grupo.id));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            Icon(Icons.check, color: Colors.white),
+                            SizedBox(width: 8),
+                            Text('Código copiado: ${grupo.id}'),
+                          ],
                         ),
+                        backgroundColor: Colors.green,
+                        duration: Duration(seconds: 2),
                       ),
-                      Icon(Icons.copy, size: 20),
-                    ],
+                    );
+                  },
+                  child: Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.green.withOpacity(0.5),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          grupo.id,
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 20,
+                            letterSpacing: 2,
+                            color: themeProvider.isDarkMode ? Colors.white : Colors.black,
+                          ),
+                        ),
+                        Icon(Icons.copy, size: 24, color: Colors.green),
+                      ],
+                    ),
                   ),
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Comparte este código para que otros se unan',
+                  'Toca para copiar - Comparte este código para que otros se unan',
                   style: TextStyle(
                     fontSize: 12, 
                     color: themeProvider.isDarkMode ? Colors.grey.shade500 : Colors.grey.shade600

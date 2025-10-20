@@ -215,38 +215,45 @@ class _AgendaScreenState extends State<AgendaScreen> {
               children: [
                 ListTile(
                   contentPadding: EdgeInsets.all(16),
-                  leading: rol == RolUsuario.atleta
-                      ? Checkbox(
-                          value: completada,
-                          activeColor: Colors.green,
-                          onChanged: (value) {
-                            if (value == true) {
-                              agendaProvider.completarActividad(actividad.id, widget.userEmail);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('¡Actividad completada! +${actividad.puntosBase} puntos'),
-                                  backgroundColor: Colors.green,
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            } else {
-                              // Desmarcar actividad
-                              agendaProvider.descompletarActividad(actividad.id, widget.userEmail);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Actividad desmarcada'),
-                                  backgroundColor: Colors.orange,
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            }
-                          },
-                        )
-                      : Icon(
-                          completada ? Icons.check_circle : Icons.circle_outlined,
-                          color: completada ? Colors.green : Colors.grey,
-                          size: 32,
-                        ),
+                  leading: Checkbox(
+                      value: completada,
+                      activeColor: Colors.green,
+                      onChanged: (value) {
+                        // Limpiar SnackBars previos para evitar spam
+                        ScaffoldMessenger.of(context).clearSnackBars();
+                        
+                        if (value == true) {
+                          final resultado = agendaProvider.completarActividad(actividad.id, widget.userEmail);
+                          if (resultado) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('¡Actividad completada! +${actividad.puntosBase} puntos'),
+                                backgroundColor: Colors.green,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('No puedes completar esta actividad. Tu rol cambió desde que te uniste al grupo.'),
+                                backgroundColor: Colors.red,
+                                duration: Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        } else {
+                          // Desmarcar actividad
+                          agendaProvider.descompletarActividad(actividad.id, widget.userEmail);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Actividad desmarcada'),
+                              backgroundColor: Colors.orange,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                    ),
                   title: Text(
                     actividad.nombre,
                     style: TextStyle(
@@ -291,56 +298,100 @@ class _AgendaScreenState extends State<AgendaScreen> {
                       ? Icon(Icons.check_circle, color: Colors.green, size: 32)
                       : null,
                 ),
-                // Mostrar quiénes completaron la actividad (para entrenadores)
-                if (rol == RolUsuario.entrenador && actividad.completadoPor.isNotEmpty)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(8),
-                        bottomRight: Radius.circular(8),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                // Mostrar estado de todos los miembros (para entrenadores y atletas)
+                if (grupoSeleccionado != null && grupoSeleccionado!.isNotEmpty)
+                  Builder(
+                    builder: (context) {
+                      final grupos = agendaProvider.getGruposUsuario(widget.userEmail);
+                      final grupo = grupos.firstWhere(
+                        (g) => g.id == grupoSeleccionado,
+                        orElse: () => grupos.first,
+                      );
+                      
+                      // Solo mostrar si hay más de 1 miembro
+                      if (grupo.miembrosIds.length <= 1) {
+                        return SizedBox.shrink();
+                      }
+                      
+                      return Container(
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
+                          borderRadius: BorderRadius.only(
+                            bottomLeft: Radius.circular(8),
+                            bottomRight: Radius.circular(8),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.check_circle, size: 16, color: Colors.green),
-                            SizedBox(width: 4),
-                            Text(
-                              'Completado por:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
+                            Row(
+                              children: [
+                                Icon(Icons.people, size: 16, color: Colors.blue),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Estado del equipo:',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Spacer(),
+                                Text(
+                                  '${actividad.completadoPor.length}/${grupo.miembrosIds.length} completaron',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: grupo.miembrosIds.map((email) {
+                                final completado = actividad.completadoPor.contains(email);
+                                return Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: completado 
+                                        ? Colors.green.shade100 
+                                        : (themeProvider.isDarkMode ? Colors.grey.shade700 : Colors.grey.shade200),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: completado ? Colors.green : Colors.grey.shade400,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        completado ? Icons.check_circle : Icons.radio_button_unchecked,
+                                        size: 16,
+                                        color: completado ? Colors.green.shade700 : Colors.grey.shade500,
+                                      ),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        email.split('@')[0],
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: completado ? FontWeight.bold : FontWeight.normal,
+                                          color: completado 
+                                              ? Colors.green.shade900 
+                                              : (themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
                             ),
                           ],
                         ),
-                        SizedBox(height: 4),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: actividad.completadoPor.map((email) {
-                            return Chip(
-                              avatar: CircleAvatar(
-                                child: Text(
-                                  email[0].toUpperCase(),
-                                  style: TextStyle(fontSize: 10),
-                                ),
-                              ),
-                              label: Text(
-                                email.split('@')[0],
-                                style: TextStyle(fontSize: 12),
-                              ),
-                              visualDensity: VisualDensity.compact,
-                              backgroundColor: Colors.green.shade100,
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
               ],
             ),

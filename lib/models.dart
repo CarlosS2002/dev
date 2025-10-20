@@ -6,6 +6,7 @@ class Grupo {
   final String entrenadorId;
   final String entrenadorNombre;
   final List<String> miembrosIds;
+  final Map<String, RolUsuario> rolesAlUnirse; // Rol que tenía cada miembro al unirse
   final DateTime fechaCreacion;
 
   Grupo({
@@ -15,8 +16,9 @@ class Grupo {
     required this.entrenadorId,
     required this.entrenadorNombre,
     required this.miembrosIds,
+    Map<String, RolUsuario>? rolesAlUnirse,
     required this.fechaCreacion,
-  });
+  }) : rolesAlUnirse = rolesAlUnirse ?? {};
 }
 
 // Modelo para representar una Actividad

@@ -6,6 +6,7 @@ class AgendaProvider extends ChangeNotifier {
   final Map<String, RolUsuario> _rolesUsuarios = {
     'carlos@test.com': RolUsuario.entrenador,
     'maria@test.com': RolUsuario.atleta,
+    'pedro@test.com': RolUsuario.atleta,
   };
 
   // Lista de grupos
@@ -16,7 +17,12 @@ class AgendaProvider extends ChangeNotifier {
       descripcion: 'Grupo de entrenamiento intensivo',
       entrenadorId: 'carlos@test.com',
       entrenadorNombre: 'Carlos',
-      miembrosIds: ['carlos@test.com', 'maria@test.com'],
+      miembrosIds: ['carlos@test.com', 'maria@test.com', 'pedro@test.com'],
+      rolesAlUnirse: {
+        'carlos@test.com': RolUsuario.entrenador,
+        'maria@test.com': RolUsuario.atleta,
+        'pedro@test.com': RolUsuario.atleta,
+      },
       fechaCreacion: DateTime.now(),
     ),
   ];
@@ -32,7 +38,7 @@ class AgendaProvider extends ChangeNotifier {
       descripcion: 'Correr 8km a ritmo moderado-alto',
       puntosBase: 60,
       creadoPor: 'carlos@test.com',
-      completadoPor: [],
+      completadoPor: ['pedro@test.com'], // Pedro completó
     ),
     Actividad(
       id: 'act2',
@@ -52,7 +58,7 @@ class AgendaProvider extends ChangeNotifier {
       descripcion: 'Sesión de yoga de 45 minutos + estiramientos',
       puntosBase: 50,
       creadoPor: 'carlos@test.com',
-      completadoPor: [],
+      completadoPor: ['pedro@test.com'], // Pedro completó
     ),
     Actividad(
       id: 'act4',
@@ -84,7 +90,7 @@ class AgendaProvider extends ChangeNotifier {
       descripcion: 'Entrenamiento de intervalos de alta intensidad - 30 min',
       puntosBase: 80,
       creadoPor: 'carlos@test.com',
-      completadoPor: [],
+      completadoPor: ['pedro@test.com'], // Pedro completó
     ),
     Actividad(
       id: 'act7',
@@ -104,7 +110,7 @@ class AgendaProvider extends ChangeNotifier {
       descripcion: 'Entrenamiento de boxeo con saco - 45 minutos',
       puntosBase: 70,
       creadoPor: 'carlos@test.com',
-      completadoPor: [],
+      completadoPor: ['pedro@test.com'], // Pedro completó
     ),
     Actividad(
       id: 'act9',
@@ -169,7 +175,24 @@ class AgendaProvider extends ChangeNotifier {
 
   // Agregar un nuevo grupo
   void agregarGrupo(Grupo grupo) {
-    _grupos.add(grupo);
+    // Registrar el rol de cada miembro al momento de crear el grupo
+    final rolesActualizados = Map<String, RolUsuario>.from(grupo.rolesAlUnirse);
+    for (var miembroId in grupo.miembrosIds) {
+      rolesActualizados[miembroId] = getRol(miembroId);
+    }
+    
+    final grupoActualizado = Grupo(
+      id: grupo.id,
+      nombre: grupo.nombre,
+      descripcion: grupo.descripcion,
+      entrenadorId: grupo.entrenadorId,
+      entrenadorNombre: grupo.entrenadorNombre,
+      miembrosIds: grupo.miembrosIds,
+      rolesAlUnirse: rolesActualizados,
+      fechaCreacion: grupo.fechaCreacion,
+    );
+    
+    _grupos.add(grupoActualizado);
     notifyListeners();
   }
 
@@ -180,12 +203,21 @@ class AgendaProvider extends ChangeNotifier {
   }
 
   // Completar una actividad
-  void completarActividad(String actividadId, String usuarioEmail) {
+  bool completarActividad(String actividadId, String usuarioEmail) {
     final index = _actividades.indexWhere((act) => act.id == actividadId);
     if (index != -1 && !_actividades[index].completadoPor.contains(usuarioEmail)) {
-      _actividades[index].completadoPor.add(usuarioEmail);
+      final actividad = _actividades[index];
+      
+      // Validar que el usuario pueda participar en este grupo
+      if (!puedeParticiparEnGrupo(actividad.grupoId, usuarioEmail)) {
+        return false; // No puede completar porque su rol cambió
+      }
+      
+      actividad.completadoPor.add(usuarioEmail);
       notifyListeners();
+      return true;
     }
+    return false;
   }
 
   // Desmarcar una actividad completada (para cuando se completa por error)
@@ -240,9 +272,26 @@ class AgendaProvider extends ChangeNotifier {
     final index = _grupos.indexWhere((g) => g.id == grupoId);
     if (index != -1 && !_grupos[index].miembrosIds.contains(usuarioEmail)) {
       _grupos[index].miembrosIds.add(usuarioEmail);
+      // Registrar el rol actual del usuario al unirse
+      _grupos[index].rolesAlUnirse[usuarioEmail] = getRol(usuarioEmail);
       notifyListeners();
       return true;
     }
     return false;
+  }
+
+  // Verificar si un usuario puede participar en actividades del grupo
+  bool puedeParticiparEnGrupo(String grupoId, String usuarioEmail) {
+    final grupo = _grupos.firstWhere((g) => g.id == grupoId, orElse: () => _grupos[0]);
+    if (grupo.id != grupoId) return false;
+    
+    // Verificar si es miembro
+    if (!grupo.miembrosIds.contains(usuarioEmail)) return false;
+    
+    // Verificar si el rol actual coincide con el rol al unirse
+    final rolActual = getRol(usuarioEmail);
+    final rolAlUnirse = grupo.rolesAlUnirse[usuarioEmail];
+    
+    return rolActual == rolAlUnirse;
   }
 }
