@@ -294,9 +294,40 @@ class _AgendaScreenState extends State<AgendaScreen> {
                       ),
                     ],
                   ),
-                  trailing: completada
-                      ? Icon(Icons.check_circle, color: Colors.green, size: 32)
-                      : null,
+                  trailing: rol == RolUsuario.entrenador && grupoSeleccionado != null
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (completada)
+                              Icon(Icons.check_circle, color: Colors.green, size: 32)
+                            else
+                              SizedBox(width: 32),
+                            SizedBox(width: 8),
+                            // Botón de editar
+                            IconButton(
+                              icon: Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () => _mostrarDialogoEditarActividad(
+                                context, 
+                                agendaProvider, 
+                                actividad
+                              ),
+                              tooltip: 'Editar actividad',
+                            ),
+                            // Botón de eliminar
+                            IconButton(
+                              icon: Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _confirmarEliminarActividad(
+                                context, 
+                                agendaProvider, 
+                                actividad
+                              ),
+                              tooltip: 'Eliminar actividad',
+                            ),
+                          ],
+                        )
+                      : completada
+                          ? Icon(Icons.check_circle, color: Colors.green, size: 32)
+                          : null,
                 ),
                 // Mostrar estado de todos los miembros (para entrenadores y atletas)
                 if (grupoSeleccionado != null && grupoSeleccionado!.isNotEmpty)
@@ -504,6 +535,192 @@ class _AgendaScreenState extends State<AgendaScreen> {
               }
             },
             child: Text('Crear'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Diálogo para editar una actividad existente
+  void _mostrarDialogoEditarActividad(BuildContext context, AgendaProvider agendaProvider, Actividad actividad) {
+    final nombreController = TextEditingController(text: actividad.nombre);
+    final descripcionController = TextEditingController(text: actividad.descripcion);
+    final puntosController = TextEditingController(text: actividad.puntosBase.toString());
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Editar Actividad'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nombreController,
+                style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: 'Nombre de la actividad',
+                  labelStyle: TextStyle(color: themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
+                  border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
+                  ),
+                ),
+              ),
+              SizedBox(height: 12),
+              TextField(
+                controller: descripcionController,
+                style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: 'Descripción (opcional)',
+                  labelStyle: TextStyle(color: themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
+                  border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
+                  ),
+                ),
+                maxLines: 3,
+              ),
+              SizedBox(height: 12),
+              TextField(
+                controller: puntosController,
+                style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: 'Puntos base',
+                  labelStyle: TextStyle(color: themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
+                  border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
+                  ),
+                  suffixIcon: Icon(Icons.stars, color: Colors.amber),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nombreController.text.isNotEmpty &&
+                  puntosController.text.isNotEmpty) {
+                final puntos = int.tryParse(puntosController.text) ?? 0;
+                if (puntos > 0) {
+                  agendaProvider.editarActividad(
+                    actividad.id,
+                    nombreController.text,
+                    descripcionController.text,
+                    puntos,
+                  );
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Actividad actualizada exitosamente'),
+                      backgroundColor: Colors.blue,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Confirmar eliminación de actividad
+  void _confirmarEliminarActividad(BuildContext context, AgendaProvider agendaProvider, Actividad actividad) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange, size: 28),
+            SizedBox(width: 12),
+            Text('Confirmar eliminación'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '¿Estás seguro de que deseas eliminar esta actividad?',
+              style: TextStyle(fontSize: 16),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    actividad.nombre,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.red.shade900,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '${actividad.puntosBase} puntos',
+                    style: TextStyle(color: Colors.red.shade700),
+                  ),
+                  if (actividad.completadoPor.isNotEmpty) ...[
+                    SizedBox(height: 8),
+                    Text(
+                      '⚠️ ${actividad.completadoPor.length} usuario(s) ya completaron esta actividad',
+                      style: TextStyle(
+                        color: Colors.orange.shade900,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              agendaProvider.eliminarActividad(actividad.id);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.delete, color: Colors.white),
+                      SizedBox(width: 12),
+                      Text('Actividad eliminada'),
+                    ],
+                  ),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: Text('Eliminar', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

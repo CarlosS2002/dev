@@ -202,6 +202,32 @@ class AgendaProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Editar una actividad existente
+  void editarActividad(String actividadId, String nombre, String descripcion, int puntosBase) {
+    final index = _actividades.indexWhere((act) => act.id == actividadId);
+    if (index != -1) {
+      final actividadAntigua = _actividades[index];
+      // Crear nueva actividad con los datos actualizados
+      _actividades[index] = Actividad(
+        id: actividadAntigua.id,
+        nombre: nombre,
+        grupoId: actividadAntigua.grupoId,
+        fecha: actividadAntigua.fecha,
+        descripcion: descripcion,
+        puntosBase: puntosBase,
+        creadoPor: actividadAntigua.creadoPor,
+        completadoPor: actividadAntigua.completadoPor,
+      );
+      notifyListeners();
+    }
+  }
+
+  // Eliminar una actividad
+  void eliminarActividad(String actividadId) {
+    _actividades.removeWhere((act) => act.id == actividadId);
+    notifyListeners();
+  }
+
   // Completar una actividad
   bool completarActividad(String actividadId, String usuarioEmail) {
     final index = _actividades.indexWhere((act) => act.id == actividadId);
