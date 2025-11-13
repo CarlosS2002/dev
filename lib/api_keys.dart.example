@@ -1,0 +1,17 @@
+/// ⚠️ NUNCA subas este archivo a Git
+/// Este archivo contiene las claves de API privadas
+/// 
+/// INSTRUCCIONES:
+/// 1. Copia este archivo y renómbralo a 'api_keys.dart'
+/// 2. Reemplaza las claves con tus propias API keys
+/// 3. NO subas api_keys.dart a Git (está en .gitignore)
+
+class ApiKeys {
+  // Obtén tu API Key de Google Maps desde:
+  // https://console.cloud.google.com/google/maps-apis
+  static const String googleMapsApiKey = 'TU_GOOGLE_MAPS_API_KEY_AQUI';
+  
+  // Obtén tu API Key de Gemini desde:
+  // https://makersuite.google.com/app/apikey
+  static const String geminiApiKey = 'TU_GEMINI_API_KEY_AQUI';
+}

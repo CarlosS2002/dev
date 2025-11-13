@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'menu_screen.dart';
 import 'theme_provider.dart';
+import 'agenda_provider.dart';
+import 'models.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -28,73 +32,93 @@ class _AuthScreenState extends State<AuthScreen> {
 
   void register() async {
     final result = await Navigator.pushNamed(context, '/register');
-    if (result != null && result is Map<String, String>) {
+    if (result == true) {
       setState(() {
         isRegistered = true;
-        registeredEmail = result['email'];
-        registeredPassword = result['password'];
       });
     }
   }
 
-  void login() {
-    final enteredEmail = emailController.text;
+  Future<void> login() async {
+    final enteredEmail = emailController.text.trim();
     final enteredPassword = passwordController.text;
 
-    // Verificar usuarios de prueba primero
-    if (testUsers.containsKey(enteredEmail) && testUsers[enteredEmail] == enteredPassword) {
-      setState(() {
-        isLoggedIn = true;
-        currentUserEmail = enteredEmail;
-      });
+    if (enteredEmail.isEmpty || enteredPassword.isEmpty) {
+      _mostrarError('Por favor ingresa correo y contraseña');
       return;
     }
 
-    // Verificar usuario registrado
-    if (isRegistered) {
-      if (enteredEmail == registeredEmail && enteredPassword == registeredPassword) {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(child: CircularProgressIndicator()),
+      );
+
+      final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: enteredEmail,
+        password: enteredPassword,
+      );
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userCredential.user!.uid)
+          .get();
+
+      if (userDoc.exists && mounted) {
+        final userData = userDoc.data()!;
+        final rolString = userData['rol'] as String;
+        final rol = RolUsuario.values.firstWhere(
+          (e) => e.toString().split('.').last == rolString,
+          orElse: () => RolUsuario.atleta,
+        );
+
+        final agendaProvider = Provider.of<AgendaProvider>(context, listen: false);
+        agendaProvider.setRol(enteredEmail, rol);
+
+        if (mounted) Navigator.pop(context);
+
         setState(() {
           isLoggedIn = true;
           currentUserEmail = enteredEmail;
         });
       } else {
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: Text('Error de inicio de sesión'),
-              content: Text('Correo o contraseña incorrectos.'),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: Text('Cerrar'),
-                ),
-              ],
-            );
-          },
-        );
+        if (mounted) Navigator.pop(context);
+        _mostrarError('No se encontraron datos del usuario');
       }
-    } else {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Error de inicio de sesión'),
-            content: Text('Correo o contraseña incorrectos.'),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: Text('Cerrar'),
-              ),
-            ],
-          );
-        },
-      );
+    } on FirebaseAuthException catch (e) {
+      if (mounted) Navigator.pop(context);
+      
+      String errorMessage = switch (e.code) {
+        'user-not-found' => 'No existe una cuenta con este correo',
+        'wrong-password' => 'Contraseña incorrecta',
+        'invalid-email' => 'El correo no es válido',
+        'user-disabled' => 'Esta cuenta ha sido deshabilitada',
+        'invalid-credential' => 'Correo o contraseña incorrectos',
+        _ => 'Error: ${e.message}'
+      };
+      
+      _mostrarError(errorMessage);
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      _mostrarError('Error inesperado: $e');
     }
+  }
+
+  void _mostrarError(String mensaje) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Error de inicio de sesión'),
+        content: Text(mensaje),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
   }
 
   void logout() {
