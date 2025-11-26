@@ -4,6 +4,8 @@ import 'agenda_provider.dart';
 import 'models.dart';
 import 'package:intl/intl.dart';
 import 'theme_provider.dart';
+import 'ai_service.dart';
+import 'firebase_service.dart';
 
 class AgendaScreen extends StatefulWidget {
   final String userEmail;
@@ -131,8 +133,21 @@ class _AgendaScreenState extends State<AgendaScreen> {
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                  value: grupoSeleccionado,
+                    Builder(
+                      builder: (context) {
+                        // Validar que grupoSeleccionado existe en la lista
+                        final grupoValido = grupoSeleccionado == null ||
+                            grupos.any((g) => g.id == grupoSeleccionado);
+                        if (!grupoValido) {
+                          // Si el grupo no existe, resetear a null
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            setState(() {
+                              grupoSeleccionado = null;
+                            });
+                          });
+                        }
+                        return DropdownButtonFormField<String>(
+                  value: grupoValido ? grupoSeleccionado : null,
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.white,
@@ -179,7 +194,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
                       grupoSeleccionado = value;
                     });
                   },
-                ),
+                );
+                      },
+                    ),
               ],
             ),
           ),
@@ -273,7 +290,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
     }
 
     return ListView.builder(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 150),
       itemCount: actividades.length,
       itemBuilder: (context, index) {
         final actividad = actividades[index];
@@ -361,13 +378,38 @@ class _AgendaScreenState extends State<AgendaScreen> {
                               ],
                             ),
                           ),
-                          // Iconos de acción para entrenador
+                          // Iconos de acción para entrenador en grupos
                           if (rol == RolUsuario.entrenador && grupoSeleccionado != null) ...[
                             IconButton(
                               icon: Icon(Icons.edit, color: Colors.blue, size: 20),
                               padding: EdgeInsets.zero,
                               constraints: BoxConstraints(),
                               onPressed: () => _mostrarDialogoEditarActividad(
+                                context, 
+                                agendaProvider, 
+                                actividad
+                              ),
+                              tooltip: 'Editar actividad',
+                            ),
+                            SizedBox(width: 8),
+                            IconButton(
+                              icon: Icon(Icons.delete, color: Colors.red, size: 20),
+                              padding: EdgeInsets.zero,
+                              constraints: BoxConstraints(),
+                              onPressed: () => _confirmarEliminarActividad(
+                                context, 
+                                agendaProvider, 
+                                actividad
+                              ),
+                              tooltip: 'Eliminar actividad',
+                            ),
+                          // Iconos de acción para actividades personales (sin grupo)
+                          ] else if (grupoSeleccionado == null && actividad.creadoPor == widget.userEmail) ...[
+                            IconButton(
+                              icon: Icon(Icons.edit, color: Colors.blue, size: 20),
+                              padding: EdgeInsets.zero,
+                              constraints: BoxConstraints(),
+                              onPressed: () => _mostrarDialogoEditarActividadPersonal(
                                 context, 
                                 agendaProvider, 
                                 actividad
@@ -445,82 +487,135 @@ class _AgendaScreenState extends State<AgendaScreen> {
                         return SizedBox.shrink();
                       }
                       
-                      return Container(
-                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
-                          borderRadius: BorderRadius.only(
-                            bottomLeft: Radius.circular(8),
-                            bottomRight: Radius.circular(8),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.people, size: 16, color: Colors.blue),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Estado del equipo:',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                Spacer(),
-                                Text(
-                                  '${actividad.completadoPor.length}/${grupo.miembrosIds.length} completaron',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: grupo.miembrosIds.map((email) {
-                                final completado = actividad.completadoPor.contains(email);
-                                return Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: completado 
-                                        ? Colors.green.shade100 
-                                        : (themeProvider.isDarkMode ? Colors.grey.shade700 : Colors.grey.shade200),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: completado ? Colors.green : Colors.grey.shade400,
-                                      width: 1.5,
+                      return InkWell(
+                        onTap: () {
+                          // Mostrar modal con el estado completo del equipo
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) => Container(
+                              constraints: BoxConstraints(
+                                maxHeight: MediaQuery.of(context).size.height * 0.6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: themeProvider.isDarkMode ? Colors.grey.shade900 : Colors.white,
+                                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Handle del modal
+                                  Container(
+                                    margin: EdgeInsets.only(top: 12),
+                                    width: 40,
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade400,
+                                      borderRadius: BorderRadius.circular(2),
                                     ),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        completado ? Icons.check_circle : Icons.radio_button_unchecked,
-                                        size: 16,
-                                        color: completado ? Colors.green.shade700 : Colors.grey.shade500,
-                                      ),
-                                      SizedBox(width: 6),
-                                      Text(
-                                        agendaProvider.getNombreUsuarioSync(email),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: completado ? FontWeight.bold : FontWeight.normal,
-                                          color: completado 
-                                              ? Colors.green.shade900 
-                                              : (themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
+                                  // Título
+                                  Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.people, color: Colors.blue),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Estado del equipo',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                        Spacer(),
+                                        Container(
+                                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.shade100,
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          child: Text(
+                                            '${actividad.completadoPor.length}/${grupo.miembrosIds.length}',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.blue.shade700,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                );
-                              }).toList(),
+                                  Divider(height: 1),
+                                  // Lista de miembros con scroll
+                                  Flexible(
+                                    child: ListView.builder(
+                                      shrinkWrap: true,
+                                      padding: EdgeInsets.symmetric(vertical: 8),
+                                      itemCount: grupo.miembrosIds.length,
+                                      itemBuilder: (context, index) {
+                                        final email = grupo.miembrosIds[index];
+                                        final completado = actividad.completadoPor.contains(email);
+                                        return ListTile(
+                                          leading: CircleAvatar(
+                                            backgroundColor: completado ? Colors.green : Colors.grey.shade400,
+                                            child: Icon(
+                                              completado ? Icons.check : Icons.person,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          title: Text(
+                                            agendaProvider.getNombreUsuarioSync(email),
+                                            style: TextStyle(
+                                              fontWeight: completado ? FontWeight.bold : FontWeight.normal,
+                                            ),
+                                          ),
+                                          trailing: completado
+                                              ? Icon(Icons.check_circle, color: Colors.green)
+                                              : Icon(Icons.radio_button_unchecked, color: Colors.grey),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
+                          );
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
+                            borderRadius: BorderRadius.only(
+                              bottomLeft: Radius.circular(8),
+                              bottomRight: Radius.circular(8),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.people, size: 16, color: Colors.blue),
+                              SizedBox(width: 8),
+                              Text(
+                                'Estado del equipo',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                '${actividad.completadoPor.length}/${grupo.miembrosIds.length}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue.shade700,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Spacer(),
+                              Icon(Icons.keyboard_arrow_up, size: 18, color: Colors.grey),
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -534,14 +629,475 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   Widget? _buildBotonAccion(BuildContext context, AgendaProvider agendaProvider, RolUsuario rol) {
+    // Actividades personales (sin grupo seleccionado) - disponible para cualquier rol
+    if (grupoSeleccionado == null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Botón de generar con IA
+          FloatingActionButton.extended(
+            heroTag: 'btn_ia',
+            onPressed: () => _mostrarDialogoGenerarConIA(context, agendaProvider),
+            icon: Icon(Icons.auto_awesome),
+            label: Text('Generar con IA'),
+            backgroundColor: Colors.purple,
+          ),
+          SizedBox(height: 12),
+          // Botón de crear manualmente
+          FloatingActionButton.extended(
+            heroTag: 'btn_crear',
+            onPressed: () => _mostrarDialogoCrearActividadPersonal(context, agendaProvider),
+            icon: Icon(Icons.add),
+            label: Text('Crear Actividad'),
+          ),
+        ],
+      );
+    }
+    
+    // Actividades de grupo - solo para entrenadores
     if (rol == RolUsuario.entrenador && grupoSeleccionado != null) {
       return FloatingActionButton.extended(
+        heroTag: 'btn_crear_grupo',
         onPressed: () => _mostrarDialogoCrearActividad(context, agendaProvider),
         icon: Icon(Icons.add),
         label: Text('Crear Actividad'),
       );
     }
     return null;
+  }
+
+  // Diálogo para crear actividad personal (sin grupo)
+  void _mostrarDialogoCrearActividadPersonal(BuildContext context, AgendaProvider agendaProvider) {
+    final nombreController = TextEditingController();
+    final descripcionController = TextEditingController();
+    final puntosController = TextEditingController();
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Crear Actividad Personal'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nombreController,
+                style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: 'Nombre de la actividad',
+                  labelStyle: TextStyle(color: themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
+                  border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
+                  ),
+                ),
+              ),
+              SizedBox(height: 12),
+              TextField(
+                controller: descripcionController,
+                style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: 'Descripción (opcional)',
+                  labelStyle: TextStyle(color: themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
+                  border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
+                  ),
+                ),
+                maxLines: 3,
+              ),
+              SizedBox(height: 12),
+              TextField(
+                controller: puntosController,
+                style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: 'Puntos base',
+                  labelStyle: TextStyle(color: themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
+                  border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
+                  ),
+                  suffixIcon: Icon(Icons.stars, color: Colors.amber),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nombreController.text.isNotEmpty && puntosController.text.isNotEmpty) {
+                final puntos = int.tryParse(puntosController.text) ?? 0;
+                if (puntos > 0) {
+                  await agendaProvider.agregarActividad(
+                    Actividad(
+                      id: DateTime.now().millisecondsSinceEpoch.toString(),
+                      nombre: nombreController.text,
+                      grupoId: '', // Actividad personal - sin grupo
+                      fecha: fechaSeleccionada,
+                      descripcion: descripcionController.text,
+                      puntosBase: puntos,
+                      completadoPor: [],
+                      creadoPor: widget.userEmail,
+                    ),
+                  );
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('✅ Actividad personal creada'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text('Crear'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Lista para guardar las actividades generadas por IA (para poder eliminarlas)
+  List<String> _actividadesGeneradasIA = [];
+
+  void _mostrarDialogoGenerarConIA(BuildContext context, AgendaProvider agendaProvider) async {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final firebaseService = FirebaseService();
+    final aiService = AIService();
+    
+    // Variables de estado
+    String? tipoSeleccionado;
+    bool isLoading = false;
+    List<Map<String, dynamic>> actividadesGeneradas = [];
+    String? errorMessage;
+    
+    // Cargar datos del usuario
+    String sexo = 'Masculino';
+    int edad = 25;
+    
+    try {
+      final perfilData = await firebaseService.cargarPerfil(widget.userEmail);
+      if (perfilData != null) {
+        sexo = perfilData['sexo'] ?? 'Masculino';
+        if (perfilData['fechaNacimiento'] != null) {
+          DateTime? fechaNac;
+          if (perfilData['fechaNacimiento'] is String) {
+            fechaNac = DateTime.tryParse(perfilData['fechaNacimiento']);
+          }
+          if (fechaNac != null) {
+            edad = DateTime.now().year - fechaNac.year;
+            if (DateTime.now().month < fechaNac.month ||
+                (DateTime.now().month == fechaNac.month && DateTime.now().day < fechaNac.day)) {
+              edad--;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('Error cargando perfil: $e');
+    }
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.auto_awesome, color: Colors.purple),
+                SizedBox(width: 8),
+                Expanded(child: Text('Generar con IA')),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Info del usuario
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.person, color: Colors.purple),
+                        SizedBox(width: 8),
+                        Text('$sexo, $edad años'),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  
+                  // Selector de tipo de actividad
+                  Text(
+                    '¿Qué tipo de actividad deseas hoy?',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: tipoSeleccionado,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: themeProvider.isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    hint: Text('Selecciona un tipo'),
+                    items: AIService.tiposActividad.map((tipo) {
+                      return DropdownMenuItem(
+                        value: tipo,
+                        child: Text(tipo, style: TextStyle(fontSize: 14)),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setDialogState(() {
+                        tipoSeleccionado = value;
+                        actividadesGeneradas = [];
+                        errorMessage = null;
+                      });
+                    },
+                  ),
+                  SizedBox(height: 16),
+                  
+                  // Botón generar
+                  if (tipoSeleccionado != null && actividadesGeneradas.isEmpty && !isLoading)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          setDialogState(() {
+                            isLoading = true;
+                            errorMessage = null;
+                          });
+                          
+                          try {
+                            final actividades = await aiService.generarActividades(
+                              sexo: sexo,
+                              edad: edad,
+                              tipoActividad: tipoSeleccionado!,
+                              cantidad: 3,
+                            );
+                            setDialogState(() {
+                              actividadesGeneradas = actividades;
+                              isLoading = false;
+                            });
+                          } catch (e) {
+                            setDialogState(() {
+                              errorMessage = 'Error al generar: $e';
+                              isLoading = false;
+                            });
+                          }
+                        },
+                        icon: Icon(Icons.auto_awesome),
+                        label: Text('Generar Actividades'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  
+                  // Loading
+                  if (isLoading)
+                    Center(
+                      child: Column(
+                        children: [
+                          CircularProgressIndicator(color: Colors.purple),
+                          SizedBox(height: 12),
+                          Text('Generando actividades personalizadas...'),
+                        ],
+                      ),
+                    ),
+                  
+                  // Error
+                  if (errorMessage != null)
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error, color: Colors.red),
+                          SizedBox(width: 8),
+                          Expanded(child: Text(errorMessage!, style: TextStyle(color: Colors.red))),
+                        ],
+                      ),
+                    ),
+                  
+                  // Lista de actividades generadas
+                  if (actividadesGeneradas.isNotEmpty) ...[
+                    SizedBox(height: 8),
+                    Text(
+                      'Actividades generadas:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 8),
+                    ...actividadesGeneradas.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final actividad = entry.value;
+                      return Card(
+                        margin: EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.purple,
+                            child: Text('${index + 1}', style: TextStyle(color: Colors.white)),
+                          ),
+                          title: Text(
+                            actividad['nombre'],
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(actividad['descripcion'], maxLines: 2, overflow: TextOverflow.ellipsis),
+                              SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(Icons.stars, size: 16, color: Colors.amber),
+                                  SizedBox(width: 4),
+                                  Text('${actividad['puntos']} puntos',
+                                      style: TextStyle(color: Colors.amber.shade700, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ],
+                          ),
+                          isThreeLine: true,
+                        ),
+                      );
+                    }).toList(),
+                    
+                    SizedBox(height: 12),
+                    
+                    // Botones de acción
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              // Regenerar
+                              setDialogState(() {
+                                isLoading = true;
+                                actividadesGeneradas = [];
+                                errorMessage = null;
+                              });
+                              
+                              try {
+                                final actividades = await aiService.generarActividades(
+                                  sexo: sexo,
+                                  edad: edad,
+                                  tipoActividad: tipoSeleccionado!,
+                                  cantidad: 3,
+                                );
+                                setDialogState(() {
+                                  actividadesGeneradas = actividades;
+                                  isLoading = false;
+                                });
+                              } catch (e) {
+                                setDialogState(() {
+                                  errorMessage = 'Error al generar: $e';
+                                  isLoading = false;
+                                });
+                              }
+                            },
+                            icon: Icon(Icons.refresh),
+                            label: Text('Generar'),
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              // Guardar todas las actividades
+                              final nuevasIds = <String>[];
+                              for (var act in actividadesGeneradas) {
+                                final id = DateTime.now().millisecondsSinceEpoch.toString() + '_${actividadesGeneradas.indexOf(act)}';
+                                nuevasIds.add(id);
+                                await agendaProvider.agregarActividad(
+                                  Actividad(
+                                    id: id,
+                                    nombre: act['nombre'],
+                                    grupoId: grupoSeleccionado ?? '',
+                                    fecha: fechaSeleccionada,
+                                    descripcion: act['descripcion'],
+                                    puntosBase: act['puntos'],
+                                    completadoPor: [],
+                                    creadoPor: widget.userEmail,
+                                  ),
+                                );
+                              }
+                              
+                              // Guardar IDs para poder eliminarlas después
+                              setState(() {
+                                _actividadesGeneradasIA.addAll(nuevasIds);
+                              });
+                              
+                              Navigator.pop(dialogContext);
+                              
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('✅ ${actividadesGeneradas.length} actividades creadas con IA'),
+                                  backgroundColor: Colors.green,
+                                  action: SnackBarAction(
+                                    label: 'Deshacer',
+                                    textColor: Colors.white,
+                                    onPressed: () {
+                                      // Eliminar las actividades recién creadas
+                                      for (var id in nuevasIds) {
+                                        agendaProvider.eliminarActividad(id);
+                                      }
+                                      setState(() {
+                                        _actividadesGeneradasIA.removeWhere((id) => nuevasIds.contains(id));
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Actividades eliminadas'),
+                                          backgroundColor: Colors.orange,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: Icon(Icons.check),
+                            label: Text('Guardar'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text('Cancelar'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   void _mostrarDialogoCrearActividad(BuildContext context, AgendaProvider agendaProvider) {
@@ -735,6 +1291,105 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
   }
 
+  // Diálogo para editar una actividad personal
+  void _mostrarDialogoEditarActividadPersonal(BuildContext context, AgendaProvider agendaProvider, Actividad actividad) {
+    final nombreController = TextEditingController(text: actividad.nombre);
+    final descripcionController = TextEditingController(text: actividad.descripcion);
+    final puntosController = TextEditingController(text: actividad.puntosBase.toString());
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.edit, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('Editar Actividad'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nombreController,
+                style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: 'Nombre de la actividad',
+                  labelStyle: TextStyle(color: themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
+                  border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
+                  ),
+                ),
+              ),
+              SizedBox(height: 12),
+              TextField(
+                controller: descripcionController,
+                style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: 'Descripción (opcional)',
+                  labelStyle: TextStyle(color: themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
+                  border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
+                  ),
+                ),
+                maxLines: 3,
+              ),
+              SizedBox(height: 12),
+              TextField(
+                controller: puntosController,
+                style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: 'Puntos base',
+                  labelStyle: TextStyle(color: themeProvider.isDarkMode ? Colors.white70 : Colors.black87),
+                  border: OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: themeProvider.isDarkMode ? Colors.white38 : Colors.black38),
+                  ),
+                  suffixIcon: Icon(Icons.stars, color: Colors.amber),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nombreController.text.isNotEmpty &&
+                  puntosController.text.isNotEmpty) {
+                final puntos = int.tryParse(puntosController.text) ?? 0;
+                if (puntos > 0) {
+                  agendaProvider.editarActividad(
+                    actividad.id,
+                    nombreController.text,
+                    descripcionController.text,
+                    puntos,
+                  );
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('✅ Actividad actualizada'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Confirmar eliminación de actividad
   void _confirmarEliminarActividad(BuildContext context, AgendaProvider agendaProvider, Actividad actividad) {
     showDialog(
@@ -742,9 +1397,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.warning, color: Colors.orange, size: 28),
-            SizedBox(width: 12),
-            Text('Confirmar eliminación'),
+            Icon(Icons.warning, color: Colors.orange, size: 24),
+            SizedBox(width: 8),
+            Flexible(child: Text('Eliminar', style: TextStyle(fontSize: 18))),
           ],
         ),
         content: Column(

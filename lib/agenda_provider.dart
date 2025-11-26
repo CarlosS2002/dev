@@ -113,6 +113,15 @@ class AgendaProvider extends ChangeNotifier {
         }
       }
       
+      // Cargar actividades personales del usuario (sin grupo)
+      final actividadesPersonales = await _firebaseService.cargarActividadesPersonales(email);
+      print('📋 Actividades personales: ${actividadesPersonales.length}');
+      for (var actividad in actividadesPersonales) {
+        if (!_actividades.any((a) => a.id == actividad.id)) {
+          _actividades.add(actividad);
+        }
+      }
+      
       // Cargar contador de notificaciones no leídas
       await actualizarContadorNotificaciones(email);
       
@@ -237,6 +246,15 @@ class AgendaProvider extends ChangeNotifier {
             final nombre = await _firebaseService.obtenerNombreUsuario(miembroEmail);
             _nombresCache[miembroEmail] = nombre ?? miembroEmail.split('@')[0];
           }
+        }
+      }
+      
+      // Recargar actividades personales del usuario (sin grupo)
+      final actividadesPersonales = await _firebaseService.cargarActividadesPersonales(email);
+      print('📋 Actividades personales: ${actividadesPersonales.length}');
+      for (var actividad in actividadesPersonales) {
+        if (!_actividades.any((a) => a.id == actividad.id)) {
+          _actividades.add(actividad);
         }
       }
       

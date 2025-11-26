@@ -421,6 +421,25 @@ class FirebaseService {
     }
   }
 
+  /// Cargar actividades personales del usuario (sin grupo)
+  Future<List<Actividad>> cargarActividadesPersonales(String email) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('actividades')
+          .where('grupoId', isEqualTo: '')
+          .where('creadoPor', isEqualTo: email)
+          .get();
+      
+      return querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        return _actividadFromFirestore(data);
+      }).toList();
+    } catch (e) {
+      print('Error cargando actividades personales: $e');
+      return [];
+    }
+  }
+
   /// Editar actividad
   Future<bool> editarActividad(String actividadId, String nombre, String descripcion, int puntosBase) async {
     try {
