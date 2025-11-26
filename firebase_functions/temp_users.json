@@ -1,0 +1,21 @@
+{"users": [
+{
+  "localId": "fqIV3VuDiuWwJ3eZub92jzeaQe62",
+  "email": "cardasalo@gmail.com",
+  "emailVerified": false,
+  "passwordHash": "2BCwOcTVww7J6jDAtfjVJ9a2NGrJBAoHM0p/kj1apaBcHy64U4FGPj5eoO/ynL28J49HqRaPJD9Up0wrvF12Ng==",
+  "salt": "vjritT4gznHp6A==",
+  "lastSignedInAt": "1764164449120",
+  "createdAt": "1764116681226",
+  "providerUserInfo": []
+},
+{
+  "localId": "viBcKKjKIphjfi1YkOcvsotrDPv2",
+  "email": "claplora@yahoo.com",
+  "emailVerified": false,
+  "passwordHash": "wmGIW8xg/lwrqKp078XmGHW+V2vTpMzjj+KYXBPwJj2LatZrtzA2H1btDeQGuKQ8CYzPk6PvxpI67yL5tbcoew==",
+  "salt": "sqOC02Drv9lw6g==",
+  "lastSignedInAt": "1764160664992",
+  "createdAt": "1764127091398",
+  "providerUserInfo": []
+}]}

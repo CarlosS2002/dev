@@ -5,11 +5,9 @@
         android:icon="@mipmap/ic_launcher">
         
         <!-- Google Maps API Key -->
-        <!-- ⚠️ IMPORTANTE: Reemplaza YOUR_GOOGLE_MAPS_API_KEY con tu clave real -->
-        <!-- Ver instrucciones en SEGURIDAD_API_KEYS.md -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="YOUR_GOOGLE_MAPS_API_KEY"/>
+            android:value="AIzaSyCUwXaUvQGkxZUmx81i1JfLgsSFbCY1o44"/>
         
         <activity
             android:name=".MainActivity"
@@ -44,6 +42,17 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    
+    <!-- Permisos para tracking de actividad física -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    
+    <!-- Permiso para notificaciones (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
     
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -1,0 +1,15 @@
+/// ⚠️ INSTRUCCIONES DE CONFIGURACIÓN
+/// 
+/// 1. Copia este archivo y renómbralo a: api_keys.dart
+/// 2. Reemplaza los valores de ejemplo con tus claves reales
+/// 3. NUNCA subas el archivo api_keys.dart a Git (ya está en .gitignore)
+
+class ApiKeys {
+  // Google Maps API Key
+  // Obtener en: https://console.cloud.google.com/apis/credentials
+  static const String googleMapsApiKey = 'TU_GOOGLE_MAPS_API_KEY_AQUI';
+  
+  // Gemini AI API Key  
+  // Obtener en: https://makersuite.google.com/app/apikey
+  static const String geminiApiKey = 'TU_GEMINI_API_KEY_AQUI';
+}

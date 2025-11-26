@@ -7,8 +7,9 @@ import 'theme_provider.dart';
 
 class AgendaScreen extends StatefulWidget {
   final String userEmail;
+  final VoidCallback? onOpenDrawer;
 
-  const AgendaScreen({super.key, required this.userEmail});
+  const AgendaScreen({super.key, required this.userEmail, this.onOpenDrawer});
 
   @override
   State<AgendaScreen> createState() => _AgendaScreenState();
@@ -29,7 +30,84 @@ class _AgendaScreenState extends State<AgendaScreen> {
         return Scaffold(
           appBar: AppBar(
             title: Text('Agenda de Actividades'),
+            leading: IconButton(
+              icon: Icon(Icons.menu),
+              onPressed: widget.onOpenDrawer,
+            ),
             actions: [
+              // Botón de notificaciones con badge
+              Stack(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.notifications),
+                    onPressed: () => _mostrarNotificaciones(context, agendaProvider),
+                    tooltip: 'Notificaciones',
+                  ),
+                  if (agendaProvider.notificacionesNoLeidas > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        child: Text(
+                          '${agendaProvider.notificacionesNoLeidas}',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              // Botón de refrescar
+              IconButton(
+                icon: Icon(Icons.refresh),
+                onPressed: () async {
+                  // Mostrar indicador de carga
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          ),
+                          SizedBox(width: 12),
+                          Text('Actualizando...'),
+                        ],
+                      ),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                  
+                  // Recargar datos
+                  await agendaProvider.recargarDatos(widget.userEmail);
+                  
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).clearSnackBars();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('✅ Datos actualizados'),
+                        backgroundColor: Colors.green,
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                  }
+                },
+                tooltip: 'Actualizar',
+              ),
               Padding(
                 padding: EdgeInsets.all(16),
                 child: Text(
@@ -213,99 +291,82 @@ class _AgendaScreenState extends State<AgendaScreen> {
             ),
             child: Column(
               children: [
-                ListTile(
-                  contentPadding: EdgeInsets.all(16),
-                  leading: Checkbox(
-                      value: completada,
-                      activeColor: Colors.green,
-                      onChanged: (value) {
-                        // Limpiar SnackBars previos para evitar spam
-                        ScaffoldMessenger.of(context).clearSnackBars();
-                        
-                        if (value == true) {
-                          final resultado = agendaProvider.completarActividad(actividad.id, widget.userEmail);
-                          if (resultado) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('¡Actividad completada! +${actividad.puntosBase} puntos'),
-                                backgroundColor: Colors.green,
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('No puedes completar esta actividad. Tu rol cambió desde que te uniste al grupo.'),
-                                backgroundColor: Colors.red,
-                                duration: Duration(seconds: 3),
-                              ),
-                            );
-                          }
-                        } else {
-                          // Desmarcar actividad
-                          agendaProvider.descompletarActividad(actividad.id, widget.userEmail);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Actividad desmarcada'),
-                              backgroundColor: Colors.orange,
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                  title: Text(
-                    actividad.nombre,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      decoration: completada ? TextDecoration.lineThrough : null,
-                    ),
-                  ),
-                  subtitle: Column(
+                Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (actividad.descripcion.isNotEmpty) ...[
-                        SizedBox(height: 8),
-                        Text(actividad.descripcion),
-                      ],
-                      SizedBox(height: 8),
+                      // Fila superior: Checkbox + Título + Acciones
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.stars, size: 16, color: Colors.amber),
-                          SizedBox(width: 4),
-                          Text(
-                            '${actividad.puntosBase} puntos',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.amber.shade700,
+                          // Checkbox
+                          Checkbox(
+                            value: completada,
+                            activeColor: Colors.green,
+                            onChanged: (value) {
+                              ScaffoldMessenger.of(context).clearSnackBars();
+                              
+                              if (value == true) {
+                                final resultado = agendaProvider.completarActividad(actividad.id, widget.userEmail);
+                                if (resultado) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('¡Actividad completada! +${actividad.puntosBase} puntos'),
+                                      backgroundColor: Colors.green,
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('No puedes completar esta actividad. Tu rol cambió desde que te uniste al grupo.'),
+                                      backgroundColor: Colors.red,
+                                      duration: Duration(seconds: 3),
+                                    ),
+                                  );
+                                }
+                              } else {
+                                agendaProvider.descompletarActividad(actividad.id, widget.userEmail);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Actividad desmarcada'),
+                                    backgroundColor: Colors.orange,
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                          // Título y descripción (expandido)
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  actividad.nombre,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    decoration: completada ? TextDecoration.lineThrough : null,
+                                  ),
+                                ),
+                                if (actividad.descripcion.isNotEmpty) ...[
+                                  SizedBox(height: 4),
+                                  Text(
+                                    actividad.descripcion,
+                                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
-                          SizedBox(width: 16),
-                          if (rol == RolUsuario.entrenador) ...[
-                            Icon(Icons.people, size: 16, color: Colors.blue),
-                            SizedBox(width: 4),
-                            Text(
-                              '${actividad.completadoPor.length} completadas',
-                              style: TextStyle(color: Colors.blue.shade700),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                  trailing: rol == RolUsuario.entrenador && grupoSeleccionado != null
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (completada)
-                              Icon(Icons.check_circle, color: Colors.green, size: 32)
-                            else
-                              SizedBox(width: 32),
-                            SizedBox(width: 8),
-                            // Botón de editar
+                          // Iconos de acción para entrenador
+                          if (rol == RolUsuario.entrenador && grupoSeleccionado != null) ...[
                             IconButton(
-                              icon: Icon(Icons.edit, color: Colors.blue),
+                              icon: Icon(Icons.edit, color: Colors.blue, size: 20),
+                              padding: EdgeInsets.zero,
+                              constraints: BoxConstraints(),
                               onPressed: () => _mostrarDialogoEditarActividad(
                                 context, 
                                 agendaProvider, 
@@ -313,9 +374,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
                               ),
                               tooltip: 'Editar actividad',
                             ),
-                            // Botón de eliminar
+                            SizedBox(width: 8),
                             IconButton(
-                              icon: Icon(Icons.delete, color: Colors.red),
+                              icon: Icon(Icons.delete, color: Colors.red, size: 20),
+                              padding: EdgeInsets.zero,
+                              constraints: BoxConstraints(),
                               onPressed: () => _confirmarEliminarActividad(
                                 context, 
                                 agendaProvider, 
@@ -323,14 +386,52 @@ class _AgendaScreenState extends State<AgendaScreen> {
                               ),
                               tooltip: 'Eliminar actividad',
                             ),
+                          ] else if (completada) ...[
+                            Icon(Icons.check_circle, color: Colors.green, size: 24),
                           ],
-                        )
-                      : completada
-                          ? Icon(Icons.check_circle, color: Colors.green, size: 32)
-                          : null,
+                        ],
+                      ),
+                      // Fila inferior: Puntos y completadas
+                      Padding(
+                        padding: EdgeInsets.only(left: 40, top: 8),
+                        child: Wrap(
+                          spacing: 16,
+                          runSpacing: 4,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.stars, size: 16, color: Colors.amber),
+                                SizedBox(width: 4),
+                                Text(
+                                  '${actividad.puntosBase} puntos',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (rol == RolUsuario.entrenador)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.people, size: 16, color: Colors.blue),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    '${actividad.completadoPor.length} completadas',
+                                    style: TextStyle(color: Colors.blue.shade700),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                // Mostrar estado de todos los miembros (para entrenadores y atletas)
-                if (grupoSeleccionado != null && grupoSeleccionado!.isNotEmpty)
+                // Mostrar estado de todos los miembros (SOLO para entrenadores)
+                if (grupoSeleccionado != null && grupoSeleccionado!.isNotEmpty && rol == RolUsuario.entrenador)
                   Builder(
                     builder: (context) {
                       final grupos = agendaProvider.getGruposUsuario(widget.userEmail);
@@ -405,7 +506,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                                       ),
                                       SizedBox(width: 6),
                                       Text(
-                                        email.split('@')[0],
+                                        agendaProvider.getNombreUsuarioSync(email),
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: completado ? FontWeight.bold : FontWeight.normal,
@@ -507,12 +608,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
             child: Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (nombreController.text.isNotEmpty &&
                   puntosController.text.isNotEmpty) {
                 final puntos = int.tryParse(puntosController.text) ?? 0;
                 if (puntos > 0) {
-                  agendaProvider.agregarActividad(
+                  await agendaProvider.agregarActividad(
                     Actividad(
                       id: DateTime.now().millisecondsSinceEpoch.toString(),
                       nombre: nombreController.text,
@@ -723,6 +824,170 @@ class _AgendaScreenState extends State<AgendaScreen> {
             child: Text('Eliminar', style: TextStyle(color: Colors.white)),
           ),
         ],
+      ),
+    );
+  }
+
+  // Mostrar diálogo de notificaciones
+  void _mostrarNotificaciones(BuildContext context, AgendaProvider agendaProvider) async {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    
+    // Cargar notificaciones
+    final notificaciones = await agendaProvider.obtenerNotificaciones(widget.userEmail);
+    
+    if (!context.mounted) return;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            // Handle
+            Container(
+              margin: EdgeInsets.symmetric(vertical: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Título
+            Padding(
+              padding: EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.notifications, color: Colors.blue, size: 28),
+                  SizedBox(width: 12),
+                  Text(
+                    'Notificaciones',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  Spacer(),
+                  if (notificaciones.isNotEmpty)
+                    TextButton(
+                      onPressed: () async {
+                        // Marcar todas como leídas
+                        for (var notif in notificaciones) {
+                          if (notif['leida'] == false) {
+                            await agendaProvider.marcarNotificacionLeida(
+                              widget.userEmail, 
+                              notif['id']
+                            );
+                          }
+                        }
+                        Navigator.pop(context);
+                      },
+                      child: Text('Marcar leídas'),
+                    ),
+                ],
+              ),
+            ),
+            Divider(height: 1),
+            // Lista de notificaciones
+            Expanded(
+              child: notificaciones.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.notifications_off, size: 64, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text(
+                            'No tienes notificaciones',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: scrollController,
+                      itemCount: notificaciones.length,
+                      itemBuilder: (context, index) {
+                        final notif = notificaciones[index];
+                        final leida = notif['leida'] == true;
+                        
+                        return Container(
+                          color: leida 
+                              ? null 
+                              : (themeProvider.isDarkMode 
+                                  ? Colors.blue.shade900.withOpacity(0.3) 
+                                  : Colors.blue.shade50),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: leida ? Colors.grey : Colors.blue,
+                              child: Icon(
+                                Icons.assignment,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(
+                              notif['titulo'] ?? 'Nueva actividad',
+                              style: TextStyle(
+                                fontWeight: leida ? FontWeight.normal : FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(notif['mensaje'] ?? ''),
+                                SizedBox(height: 4),
+                                Text(
+                                  notif['grupoNombre'] ?? '',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            trailing: !leida
+                                ? Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  )
+                                : null,
+                            onTap: () async {
+                              // Marcar como leída
+                              if (!leida) {
+                                await agendaProvider.marcarNotificacionLeida(
+                                  widget.userEmail, 
+                                  notif['id']
+                                );
+                              }
+                              
+                              // Seleccionar el grupo de la notificación
+                              if (notif['grupoId'] != null) {
+                                setState(() {
+                                  grupoSeleccionado = notif['grupoId'];
+                                });
+                              }
+                              
+                              Navigator.pop(context);
+                            },
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'models.dart';
 import 'agenda_provider.dart';
 import 'theme_provider.dart';
+import 'firebase_service.dart';
 
 class PerfilScreen extends StatefulWidget {
   final String userEmail;
+  final VoidCallback? onOpenDrawer;
 
-  const PerfilScreen({super.key, required this.userEmail});
+  const PerfilScreen({super.key, required this.userEmail, this.onOpenDrawer});
 
   @override
   _PerfilScreenState createState() => _PerfilScreenState();
@@ -15,9 +18,12 @@ class PerfilScreen extends StatefulWidget {
 
 class _PerfilScreenState extends State<PerfilScreen> {
   final TextEditingController nombreController = TextEditingController();
+  final FirebaseService _firebaseService = FirebaseService();
   DateTime? fechaNacimiento;
   String sexoSeleccionado = 'Masculino';
   RolUsuario rolSeleccionado = RolUsuario.atleta;
+  bool _isLoading = true;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -25,19 +31,100 @@ class _PerfilScreenState extends State<PerfilScreen> {
     _cargarDatos();
   }
 
-  void _cargarDatos() {
+  Future<void> _cargarDatos() async {
     final agendaProvider = Provider.of<AgendaProvider>(context, listen: false);
     rolSeleccionado = agendaProvider.getRol(widget.userEmail);
     
-    // Cargar datos guardados si existen
-    if (widget.userEmail == 'carlos@test.com') {
-      nombreController.text = 'Carlos Martínez';
-      fechaNacimiento = DateTime(1999, 5, 15);
-      sexoSeleccionado = 'Masculino';
-    } else if (widget.userEmail == 'maria@test.com') {
-      nombreController.text = 'María González';
-      fechaNacimiento = DateTime(1996, 8, 20);
-      sexoSeleccionado = 'Femenino';
+    // Primero intentar cargar desde Firebase (colección perfiles)
+    try {
+      final perfilData = await _firebaseService.cargarPerfil(widget.userEmail);
+      
+      if (perfilData != null && perfilData['nombre'] != null) {
+        setState(() {
+          if (perfilData['nombre'].toString().isNotEmpty) {
+            nombreController.text = perfilData['nombre'];
+          }
+          
+          if (perfilData['fechaNacimiento'] != null) {
+            // Puede ser Timestamp o String ISO8601
+            if (perfilData['fechaNacimiento'] is String) {
+              fechaNacimiento = DateTime.tryParse(perfilData['fechaNacimiento']);
+            }
+          }
+          
+          if (perfilData['sexo'] != null) {
+            sexoSeleccionado = perfilData['sexo'];
+          }
+          
+          if (perfilData['rol'] != null) {
+            rolSeleccionado = perfilData['rol'] == 'entrenador' 
+                ? RolUsuario.entrenador 
+                : RolUsuario.atleta;
+          }
+          
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      // Si no hay datos en perfiles, intentar cargar desde usuarios (registro)
+      final usuarioData = await _firebaseService.cargarDatosRegistro(widget.userEmail);
+      if (usuarioData != null) {
+        setState(() {
+          if (usuarioData['nombre'] != null && usuarioData['nombre'].toString().isNotEmpty) {
+            nombreController.text = usuarioData['nombre'];
+          }
+          
+          if (usuarioData['fechaNacimiento'] != null) {
+            fechaNacimiento = usuarioData['fechaNacimiento'];
+          }
+          
+          if (usuarioData['sexo'] != null) {
+            sexoSeleccionado = usuarioData['sexo'];
+          }
+          
+          if (usuarioData['rol'] != null) {
+            rolSeleccionado = usuarioData['rol'] == 'entrenador' 
+                ? RolUsuario.entrenador 
+                : RolUsuario.atleta;
+          }
+          
+          _isLoading = false;
+        });
+        return;
+      }
+    } catch (e) {
+      print('Error cargando de Firebase: $e');
+    }
+    
+    // Fallback: cargar desde SharedPreferences
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String key = 'perfil_${widget.userEmail}';
+      
+      final String? nombre = prefs.getString('${key}_nombre');
+      final String? fechaStr = prefs.getString('${key}_fecha_nacimiento');
+      final String? sexo = prefs.getString('${key}_sexo');
+      
+      setState(() {
+        if (nombre != null && nombre.isNotEmpty) {
+          nombreController.text = nombre;
+        }
+        
+        if (fechaStr != null) {
+          fechaNacimiento = DateTime.tryParse(fechaStr);
+        }
+        
+        if (sexo != null) {
+          sexoSeleccionado = sexo;
+        }
+        
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -81,7 +168,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
     return '${fecha.day} de ${meses[fecha.month - 1]} de ${fecha.year}';
   }
 
-  void _guardarPerfil() {
+  void _guardarPerfil() async {
     if (nombreController.text.isEmpty || fechaNacimiento == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -92,19 +179,58 @@ class _PerfilScreenState extends State<PerfilScreen> {
       return;
     }
 
-    // Guardar el rol
+    setState(() {
+      _isSaving = true;
+    });
+
+    // Guardar el rol en el provider
     final agendaProvider = Provider.of<AgendaProvider>(context, listen: false);
     agendaProvider.setRol(widget.userEmail, rolSeleccionado);
 
-    // Aquí guardarías los datos (SharedPreferences, base de datos, etc.)
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Perfil guardado exitosamente'),
-        backgroundColor: Colors.green.shade600,
-      ),
+    // Guardar en Firebase
+    final exito = await _firebaseService.guardarPerfil(
+      email: widget.userEmail,
+      nombre: nombreController.text,
+      fechaNacimiento: fechaNacimiento!,
+      sexo: sexoSeleccionado,
+      rol: rolSeleccionado,
     );
 
-    Navigator.pop(context);
+    // También guardar rol en Firebase
+    await _firebaseService.guardarRolUsuario(widget.userEmail, rolSeleccionado);
+
+    // Guardar también localmente como backup
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String key = 'perfil_${widget.userEmail}';
+      
+      await prefs.setString('${key}_nombre', nombreController.text);
+      await prefs.setString('${key}_fecha_nacimiento', fechaNacimiento!.toIso8601String());
+      await prefs.setString('${key}_sexo', sexoSeleccionado);
+    } catch (e) {
+      print('Error guardando localmente: $e');
+    }
+
+    setState(() {
+      _isSaving = false;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              Text(exito 
+                  ? '✅ Perfil guardado en la nube' 
+                  : '✅ Perfil guardado localmente'),
+            ],
+          ),
+          backgroundColor: Colors.green.shade600,
+        ),
+      );
+    }
   }
 
   @override
@@ -116,8 +242,14 @@ class _PerfilScreenState extends State<PerfilScreen> {
             title: Text('Mi Perfil'),
             backgroundColor: Colors.blue.shade600,
             foregroundColor: Colors.white,
+            leading: IconButton(
+              icon: Icon(Icons.menu),
+              onPressed: widget.onOpenDrawer,
+            ),
           ),
-          body: SingleChildScrollView(
+          body: _isLoading
+              ? Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
             padding: EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

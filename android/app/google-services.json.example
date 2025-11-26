@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "807525836127",
+    "firebase_url": "https://autenticacionlingogym-default-rtdb.firebaseio.com",
+    "project_id": "autenticacionlingogym",
+    "storage_bucket": "autenticacionlingogym.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:807525836127:android:e4650a169bc65289c102ea",
+        "android_client_info": {
+          "package_name": "com.company.LingoGym"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC9nXZZU48qQ3Z1SqLdugO_r1xFXjR0IY0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

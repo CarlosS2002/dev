@@ -8,8 +8,9 @@ import 'dart:math';
 
 class GruposScreen extends StatefulWidget {
   final String userEmail;
+  final VoidCallback? onOpenDrawer;
 
-  const GruposScreen({super.key, required this.userEmail});
+  const GruposScreen({super.key, required this.userEmail, this.onOpenDrawer});
 
   @override
   State<GruposScreen> createState() => _GruposScreenState();
@@ -29,6 +30,10 @@ class _GruposScreenState extends State<GruposScreen> {
       builder: (context, themeProvider, child) {
         final agendaProvider = Provider.of<AgendaProvider>(context);
         final rol = agendaProvider.getRol(widget.userEmail);
+        
+        // Debug: imprimir el rol actual
+        print('🎭 GruposScreen - Email: ${widget.userEmail}, Rol: $rol');
+        
         final gruposComoEntrenador = agendaProvider.getGruposComoEntrenador(widget.userEmail);
         // Si es entrenador, solo mostrar grupos que administra
         // Si es atleta, mostrar grupos donde participa
@@ -39,6 +44,10 @@ class _GruposScreenState extends State<GruposScreen> {
         return Scaffold(
           appBar: AppBar(
             title: Text('Mis Grupos'),
+            leading: IconButton(
+              icon: Icon(Icons.menu),
+              onPressed: widget.onOpenDrawer,
+            ),
           ),
           body: ListView(
             padding: EdgeInsets.all(16),
@@ -276,7 +285,7 @@ class _GruposScreenState extends State<GruposScreen> {
               child: Text('Cancelar'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 if (nombreController.text.isNotEmpty) {
                   final grupo = Grupo(
                     id: _generarCodigoGrupo(),
@@ -288,7 +297,10 @@ class _GruposScreenState extends State<GruposScreen> {
                     miembrosIds: entrenadorParticipa ? [widget.userEmail] : [],
                     fechaCreacion: DateTime.now(),
                   );
-                  agendaProvider.agregarGrupo(grupo);
+                  
+                  // Guardar grupo y esperar a que se complete
+                  await agendaProvider.agregarGrupo(grupo);
+                  
                   Navigator.pop(context);
                   
                   // Mostrar diálogo con el código del grupo
@@ -417,13 +429,27 @@ class _GruposScreenState extends State<GruposScreen> {
             child: Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (codigoController.text.isNotEmpty) {
-                final exito = agendaProvider.unirseAGrupo(
-                  codigoController.text,
+                // Mostrar indicador de carga
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+                
+                final exito = await agendaProvider.unirseAGrupo(
+                  codigoController.text.toUpperCase(),
                   widget.userEmail,
                 );
+                
+                // Cerrar indicador de carga
                 Navigator.pop(context);
+                // Cerrar diálogo de unirse
+                Navigator.pop(context);
+                
                 if (exito) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -434,7 +460,7 @@ class _GruposScreenState extends State<GruposScreen> {
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Código de grupo inválido'),
+                      content: Text('Código de grupo inválido o ya eres miembro'),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -523,6 +549,15 @@ class DetalleGrupoScreen extends StatelessWidget {
     required this.esEntrenador,
   });
 
+  String _formatearFechaHoy() {
+    final hoy = DateTime.now();
+    final meses = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    return 'Hoy es ${hoy.day} de ${meses[hoy.month - 1]}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final agendaProvider = Provider.of<AgendaProvider>(context);
@@ -575,7 +610,7 @@ class DetalleGrupoScreen extends StatelessWidget {
             ),
             SizedBox(height: 8),
             Text(
-              'Hoy es 19 de Octubre',
+              _formatearFechaHoy(),
               style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
             ),
           ],
@@ -687,8 +722,8 @@ class DetalleGrupoScreen extends StatelessWidget {
                       ? Icon(Icons.check_circle, color: Colors.green, size: 32)
                       : null,
                 ),
-                // Mostrar estado de todos los miembros (para todos)
-                if (grupo.miembrosIds.length > 1)
+                // Mostrar estado de todos los miembros (SOLO para entrenadores)
+                if (esEntrenador && grupo.miembrosIds.length > 1)
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
@@ -750,7 +785,7 @@ class DetalleGrupoScreen extends StatelessWidget {
                                   ),
                                   SizedBox(width: 6),
                                   Text(
-                                    email.split('@')[0],
+                                    agendaProvider.getNombreUsuarioSync(email),
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: completado ? FontWeight.bold : FontWeight.normal,

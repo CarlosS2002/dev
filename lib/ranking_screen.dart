@@ -5,8 +5,9 @@ import 'theme_provider.dart';
 
 class RankingScreen extends StatefulWidget {
   final String userEmail;
+  final VoidCallback? onOpenDrawer;
 
-  const RankingScreen({super.key, required this.userEmail});
+  const RankingScreen({super.key, required this.userEmail, this.onOpenDrawer});
 
   @override
   State<RankingScreen> createState() => _RankingScreenState();
@@ -14,6 +15,10 @@ class RankingScreen extends StatefulWidget {
 
 class _RankingScreenState extends State<RankingScreen> {
   String? grupoSeleccionado;
+
+  void _cargarNombres(AgendaProvider agendaProvider, String grupoId) {
+    agendaProvider.cargarNombresGrupo(grupoId);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +30,10 @@ class _RankingScreenState extends State<RankingScreen> {
         return Scaffold(
           appBar: AppBar(
             title: Text('Rankings'),
+            leading: IconButton(
+              icon: Icon(Icons.menu),
+              onPressed: widget.onOpenDrawer,
+            ),
           ),
           body: Column(
             children: [
@@ -76,6 +85,9 @@ class _RankingScreenState extends State<RankingScreen> {
                         setState(() {
                           grupoSeleccionado = value;
                         });
+                        if (value != null) {
+                          _cargarNombres(agendaProvider, value);
+                        }
                       },
                     ),
                   ],
@@ -154,6 +166,7 @@ class _RankingScreenState extends State<RankingScreen> {
       itemBuilder: (context, index) {
         final item = ranking[index];
         final usuarioEmail = item['usuarioEmail'] as String;
+        final nombre = item['nombre'] as String;
         final puntos = item['puntos'] as int;
         final actividades = item['actividades'] as int;
         final posicion = index + 1;
@@ -182,7 +195,7 @@ class _RankingScreenState extends State<RankingScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      usuarioEmail.split('@')[0],
+                      nombre,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: esUsuarioActual ? FontWeight.bold : FontWeight.normal,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'theme_provider.dart';
 import 'models.dart';
 
@@ -51,7 +53,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  void _registrar() {
+  Future<void> _registrar() async {
     if (_formKey.currentState!.validate()) {
       // Validaciones adicionales
       if (fechaNacimiento == null) {
@@ -64,16 +66,138 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
-      // Si todo está bien, retornar los datos
-      final result = {
-        'nombre': nombreController.text,
-        'email': registerEmailController.text,
-        'password': registerPasswordController.text,
-        'fechaNacimiento': fechaNacimiento,
-        'sexo': sexoSeleccionado,
-        'rol': rolSeleccionado,
-      };
-      Navigator.pop(context, result);
+      try {
+        // Mostrar indicador de carga
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+        // Crear usuario en Firebase Auth
+        final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: registerEmailController.text.trim(),
+          password: registerPasswordController.text,
+        );
+
+        final email = registerEmailController.text.trim();
+
+        // Guardar datos adicionales en Firestore (colección usuarios por UID)
+        await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userCredential.user!.uid)
+          .set({
+          'nombre': nombreController.text,
+          'email': email,
+          'fechaNacimiento': Timestamp.fromDate(fechaNacimiento!),
+          'sexo': sexoSeleccionado,
+          'rol': rolSeleccionado.toString().split('.').last,
+          'creadoEn': FieldValue.serverTimestamp(),
+        });
+
+        // También guardar en colección perfiles por email (para consistencia)
+        await FirebaseFirestore.instance
+          .collection('perfiles')
+          .doc(email)
+          .set({
+          'email': email,
+          'nombre': nombreController.text,
+          'fechaNacimiento': fechaNacimiento!.toIso8601String(),
+          'sexo': sexoSeleccionado,
+          'rol': rolSeleccionado.toString().split('.').last,
+          'actualizadoEn': FieldValue.serverTimestamp(),
+        });
+
+        // Guardar rol en colección usuarios (para AgendaProvider)
+        await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(email)
+          .set({
+          'email': email,
+          'rol': rolSeleccionado.toString().split('.').last,
+          'actualizadoEn': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        // Cerrar indicador de carga (verificar que se puede cerrar)
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+
+        // Mostrar mensaje de éxito
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('¡Registro exitoso! Ahora puedes iniciar sesión'),
+              backgroundColor: Colors.green.shade600,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+
+        // Retornar éxito - volver a la pantalla de login
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.pop(context, true);
+        }
+
+      } on FirebaseAuthException catch (e) {
+        // Cerrar indicador de carga si está abierto
+        if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+
+        String errorMessage = 'Error al registrar usuario';
+        
+        switch (e.code) {
+          case 'email-already-in-use':
+            errorMessage = 'Este correo ya está registrado';
+            break;
+          case 'weak-password':
+            errorMessage = 'La contraseña es muy débil';
+            break;
+          case 'invalid-email':
+            errorMessage = 'El correo no es válido';
+            break;
+          case 'operation-not-allowed':
+            errorMessage = 'Operación no permitida';
+            break;
+          default:
+            errorMessage = 'Error: ${e.message}';
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red.shade600,
+            ),
+          );
+        }
+      } catch (e) {
+        // Cerrar indicador de carga si está abierto
+        if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+        
+        String errorMessage = 'Error inesperado: $e';
+        
+        // Detectar errores comunes de configuración
+        if (e.toString().contains('firebase_app_check') || 
+            e.toString().contains('no Firebase App') ||
+            e.toString().contains('FirebaseOptions')) {
+          errorMessage = 'Error de configuración de Firebase.\n\n'
+              '1. Verifica que google-services.json esté en android/app/\n'
+              '2. Verifica que Firebase esté inicializado en main.dart\n'
+              '3. Ejecuta: flutter clean && flutter pub get';
+        }
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red.shade600,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+      }
     }
   }
 

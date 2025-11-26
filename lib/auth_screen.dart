@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'menu_screen.dart';
 import 'theme_provider.dart';
+import 'agenda_provider.dart';
+import 'firebase_service.dart';
+import 'models.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -15,6 +21,7 @@ class _AuthScreenState extends State<AuthScreen> {
   TextEditingController passwordController = TextEditingController();
   bool isRegistered = false;
   bool isLoggedIn = false;
+  bool _isLoading = true; // Para mostrar carga mientras verifica sesión
   String? registeredEmail;
   String? registeredPassword;
   String? currentUserEmail; // Para pasar al MenuScreen
@@ -26,23 +33,108 @@ class _AuthScreenState extends State<AuthScreen> {
     'maria@test.com': '123456',    // Usuario mujer
   };
 
+  @override
+  void initState() {
+    super.initState();
+    _checkSavedSession();
+  }
+
+  // Verificar si hay una sesión guardada
+  Future<void> _checkSavedSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedEmail = prefs.getString('user_email');
+      final isSessionActive = prefs.getBool('session_active') ?? false;
+      
+      if (savedEmail != null && savedEmail.isNotEmpty && isSessionActive) {
+        // Resetear el provider para asegurar estado limpio
+        if (mounted) {
+          Provider.of<AgendaProvider>(context, listen: false).resetear();
+        }
+        
+        // Verificar si es usuario de prueba
+        if (testUsers.containsKey(savedEmail)) {
+          setState(() {
+            isLoggedIn = true;
+            currentUserEmail = savedEmail;
+            _isLoading = false;
+          });
+          return;
+        }
+        
+        // Para usuarios de Firebase, cargar el rol guardado
+        final agendaProvider = Provider.of<AgendaProvider>(context, listen: false);
+        
+        // Cargar rol desde Firebase
+        final firebaseService = FirebaseService();
+        final rolGuardado = await firebaseService.cargarRolUsuario(savedEmail);
+        if (rolGuardado != null) {
+          agendaProvider.setRol(savedEmail, rolGuardado);
+          print('🔄 Sesión restaurada - Rol: $rolGuardado');
+        }
+        
+        setState(() {
+          isLoggedIn = true;
+          currentUserEmail = savedEmail;
+          _isLoading = false;
+        });
+        return;
+      }
+    } catch (e) {
+      print('Error verificando sesión: $e');
+    }
+    
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  // Guardar sesión
+  Future<void> _saveSession(String email) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_email', email);
+      await prefs.setBool('session_active', true);
+    } catch (e) {
+      print('Error guardando sesión: $e');
+    }
+  }
+
+  // Limpiar sesión
+  Future<void> _clearSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('user_email');
+      await prefs.setBool('session_active', false);
+    } catch (e) {
+      print('Error limpiando sesión: $e');
+    }
+  }
+
   void register() async {
     final result = await Navigator.pushNamed(context, '/register');
-    if (result != null && result is Map<String, String>) {
+    if (result == true) {
       setState(() {
         isRegistered = true;
-        registeredEmail = result['email'];
-        registeredPassword = result['password'];
       });
     }
   }
 
-  void login() {
-    final enteredEmail = emailController.text;
+  Future<void> login() async {
+    final enteredEmail = emailController.text.trim();
     final enteredPassword = passwordController.text;
 
-    // Verificar usuarios de prueba primero
+    if (enteredEmail.isEmpty || enteredPassword.isEmpty) {
+      _mostrarError('Por favor ingresa correo y contraseña');
+      return;
+    }
+
+    // Verificar usuarios de prueba primero (modo sin Firebase)
     if (testUsers.containsKey(enteredEmail) && testUsers[enteredEmail] == enteredPassword) {
+      // Resetear el provider antes de inicializar
+      Provider.of<AgendaProvider>(context, listen: false).resetear();
+      
+      await _saveSession(enteredEmail); // Guardar sesión
       setState(() {
         isLoggedIn = true;
         currentUserEmail = enteredEmail;
@@ -50,54 +142,108 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
-    // Verificar usuario registrado
-    if (isRegistered) {
-      if (enteredEmail == registeredEmail && enteredPassword == registeredPassword) {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => Center(child: CircularProgressIndicator()),
+      );
+
+      final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: enteredEmail,
+        password: enteredPassword,
+      );
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(userCredential.user!.uid)
+          .get();
+
+      // Cerrar el diálogo de carga primero
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      if (userDoc.exists && mounted) {
+        final userData = userDoc.data()!;
+        final rolString = userData['rol'] as String;
+        final rol = RolUsuario.values.firstWhere(
+          (e) => e.toString().split('.').last == rolString,
+          orElse: () => RolUsuario.atleta,
+        );
+
+        print('🔐 Login exitoso - Email: $enteredEmail, Rol: $rol');
+
+        final agendaProvider = Provider.of<AgendaProvider>(context, listen: false);
+        
+        // Resetear el provider antes de inicializar con el nuevo usuario
+        agendaProvider.resetear();
+        
+        // Establecer el rol (esto también lo guarda en Firebase usuarios/{email})
+        agendaProvider.setRol(enteredEmail, rol);
+        
+        // Asegurar que el rol se guarde en usuarios/{email} para futuras restauraciones de sesión
+        final firebaseService = FirebaseService();
+        await firebaseService.guardarRolUsuario(enteredEmail, rol);
+        print('💾 Rol guardado en usuarios/{email}: $rol');
+
+        await _saveSession(enteredEmail); // Guardar sesión
+        
         setState(() {
           isLoggedIn = true;
           currentUserEmail = enteredEmail;
         });
       } else {
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: Text('Error de inicio de sesión'),
-              content: Text('Correo o contraseña incorrectos.'),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: Text('Cerrar'),
-                ),
-              ],
-            );
-          },
-        );
+        _mostrarError('No se encontraron datos del usuario');
       }
-    } else {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Error de inicio de sesión'),
-            content: Text('Correo o contraseña incorrectos.'),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: Text('Cerrar'),
-              ),
-            ],
-          );
-        },
-      );
+    } on FirebaseAuthException catch (e) {
+      if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+      
+      String errorMessage = switch (e.code) {
+        'user-not-found' => 'No existe una cuenta con este correo',
+        'wrong-password' => 'Contraseña incorrecta',
+        'invalid-email' => 'El correo no es válido',
+        'user-disabled' => 'Esta cuenta ha sido deshabilitada',
+        'invalid-credential' => 'Correo o contraseña incorrectos',
+        _ => 'Error: ${e.message}'
+      };
+      
+      _mostrarError(errorMessage);
+    } catch (e) {
+      if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+      _mostrarError('Error inesperado: $e');
     }
   }
 
-  void logout() {
+  void _mostrarError(String mensaje) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Error de inicio de sesión'),
+        content: Text(mensaje),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void logout() async {
+    await _clearSession(); // Limpiar sesión guardada
+    
+    // Resetear el AgendaProvider
+    if (mounted) {
+      Provider.of<AgendaProvider>(context, listen: false).resetear();
+    }
+    
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (e) {
+      // Ignorar errores de Firebase signOut
+    }
     setState(() {
       isLoggedIn = false;
       currentUserEmail = null;
@@ -110,6 +256,22 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget build(BuildContext context) {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
+        // Mostrar loading mientras verifica sesión
+        if (_isLoading) {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Cargando...'),
+                ],
+              ),
+            ),
+          );
+        }
+        
         if (isLoggedIn) {
           return MenuScreen(
             userEmail: currentUserEmail ?? '',
